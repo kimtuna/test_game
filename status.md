@@ -155,3 +155,17 @@
 > HARNESS_STOP: design.md 로드맵 1차 완료 확인, 사용자 요청으로 자동 루프 중단.
 
 - 다음 할 일 (자동 세션 재개 없음 — 사용자가 직접 재개해야 함): 사용자가 `inbox.md`에 새 지시(다듬기, 새 기능, 특정 로드맵 항목 심화 등)를 남기고 `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kdw240.testgame.harness.plist`로 데몬을 다시 켜면, 다음 세션은 그 지시를 이어받아 진행하고, 새로운 완료 조건에 도달하면 다시 `HARNESS_STOP`을 남긴다.
+
+---
+
+### #48 — 2026-09-02 01:58 (수동 실행, 사용자가 하네스 사이클 1회를 직접 요청)
+
+- 계기: `HARNESS_STOP`(#47) 이후 자동 루프는 꺼져 있었지만, 사용자가 이번에는 하네스 사이클을 한 번 수동으로 실행해 달라고 요청했다. `inbox.md`를 확인하니 #4(미처리)가 있어, 규칙("`status.md`의 다음 작업보다 `inbox.md`의 미처리 항목이 우선")에 따라 이를 이어받았다. `inbox.md` #4는 우선순위가 매겨진 5개 항목(1. WASD 이동, 2. 마우스 기반 사냥, 3. 채집은 스페이스 유지, 4. 메인메뉴+슬롯+저장, 5. 제작/줍기/인벤토리 제외)을 담고 있는데, 규칙 4(기능 하나만)에 따라 이번 세션은 우선순위 1번(WASD 이동)만 구현했다.
+- 한 일:
+  - `project.godot`: `[input]` 섹션에 `move_left`/`move_right`/`move_up`/`move_down` 액션을 새로 정의하고 각각 물리 키코드 A(65)/D(68)/W(87)/S(83)에 바인딩했다. 기존 `ui_left`/`ui_right`/`ui_up`/`ui_down`(Godot 기본 액션, 화살표 키만 바인딩된 상태)은 건드리지 않았다 — 다른 곳에서 UI 포커스 이동 등에 쓰일 수 있는 엔진 기본 액션이라 재정의 대신 새 액션을 추가하는 쪽이 더 안전하다고 판단했다.
+  - `scripts/player.gd`: `_physics_process`의 `Input.get_vector("ui_left","ui_right","ui_up","ui_down")`를 `Input.get_vector("move_left","move_right","move_up","move_down")`로 교체.
+  - `tests/animal_sound_flee_headless_test.gd`: 발소리 감지 도주를 검증하기 위해 이동을 흉내내던 `Input.action_press/release("ui_left")`를 `"move_left"`로 갱신 — 이 테스트는 실제로 플레이어 이동 입력을 트리거해야 성립하므로, 액션 이름이 바뀌면 그대로 두면 거짓 통과(이동이 감지되지 않아도 이전 상태에 의존해 우연히 통과)나 실패 위험이 있어 이번 변경과 직접 관련된 테스트로 판단해 함께 수정했다.
+  - `git diff project.godot`로 확인해보니, 이 파일에는 이번 세션과 무관한 기존 미커밋 변경(세션 시작 시 이미 `M project.godot` 상태 — `[display]`의 `window/size/viewport_width`·`viewport_height`·`window/stretch/aspect` 제거, 파일 상단 표준 주석 추가)도 섞여 있었다. 실행 중이던 `godot -e`(에디터, 사용자가 열어둔 것으로 보이는 PID, 세션 시작 이전부터 떠 있었음)가 저장하며 남긴 것으로 추정된다. 같은 파일이라 분리 커밋이 불가능했고, 사용자가 에디터에서 직접 만든 변경을 되돌리는 것은 범위 밖 판단이라 그대로 두고 함께 커밋했다 — 문제가 있다면 사용자가 직접 되돌릴 수 있다.
+- 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음). 이번 변경과 직접 관련된 테스트만 개별 재실행(규칙 4 QA 지침 — 전체 24종을 다 돌리지 않음): `animal_sound_flee_headless_test`(`PASS`, 새 액션으로 도주 트리거 확인), `boundary_headless_test`(`PASS (final_x=1560.0, island_right_edge=1576.0)`, 좌표 변경 없음), `animal_flee_headless_test`(`PASS (moved_distance=135.7, ...)`), `animal_sight_flee_headless_test`(`PASS`), `customization_headless_test`(`PASS`, 이동과 무관하지만 player.gd를 같이 건드려 확인차 포함) 모두 이상 없음. `ps aux`로 확인한 결과 세션이 새로 띄운 잔여 godot 프로세스는 없었다(에디터 PID는 세션 시작 전부터 사용자가 띄워둔 것이라 그대로 둠). 이번 세션은 에러/QA 실패 없이 진행됨.
+- 남은 제약: `inbox.md` #4의 2~5번(마우스 기반 사냥/좌클릭 발사·우클릭 탄종류·R 재장전, 채집 스페이스 유지 확인, 메인메뉴+슬롯+저장 시스템, 범위 제외 항목)은 아직 손대지 않았다. 특히 2번은 `scripts/animal.gd`의 `ui_accept` 기반 공격/포획 입력을 좌클릭 발사로 교체하는 작업이라 다음 세션이 이어받아야 한다.
+- 다음 할 일: 자동 루프는 여전히 꺼진 상태(#47 `HARNESS_STOP`)이므로, 다음 실행도 사용자가 수동으로 요청하거나 launchd를 다시 켜야 한다. 다음에 이어받을 때는 `inbox.md` #4의 우선순위 2번(마우스 기반 사냥: 좌클릭 발사=공격/포획 트리거, 우클릭=탄종류 슬롯 UI, R=재장전)을 규칙 4(기능 하나만)에 따라 진행할 것을 권장한다 — 이미 이번 세션에서 관련 로직 위치(`scripts/animal.gd`의 `_attack`/포획 처리, `player.gd`의 장비 슬롯)를 확인해뒀다.
