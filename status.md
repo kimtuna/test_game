@@ -316,3 +316,25 @@
 > [!IMPORTANT]
 > HARNESS_STOP: inbox.md의 모든 항목(#1~#12)이 처리 완료됐다. 이번에 고친 해상도/화면비 버그가 실제 화면에서 잘 동작하는지는 사람이 직접 확인해야 하므로, 그 결과를 기다리며 새 지시 없이 스스로 다음 작업을 고르지 않고 자동 루프를 멈춘다.
 
+---
+
+### #73 — 2026-09-02 05:39 (사슴 좌우 반전(flip_h) 로직 추가, inbox #13 문제 1 처리)
+
+요약: `inbox.md` #13의 세 가지 동물 AI 문제 중 문제 1(이동 방향과 무관하게 항상 같은 모습으로 보이는 문제)만 이번 세션에서 처리했다(규칙 4: 기능 하나만). `animal.gd`에 좌우 반전 로직 자체가 없었던 게 원인이었고, `_start_fleeing()`이 도주 방향을 계산할 때마다 `sprite.flip_h`를 그 방향의 x 부호로 설정하도록 고쳤다. 실제 창을 띄워 스크린샷으로 직접 비교해보니 로직 자체는 정상 동작하지만, `deer_base.png`/`deer_walk_*.png` 에셋이 원래 좌우로 거의 대칭이라 육안상 차이가 미묘하다는 것도 확인했다.
+
+- 계기: `inbox.md` #13(2026-09-02 05:31)에서 사용자가 실제 플레이 중 발견한 사슴 AI 문제 3가지(방향 반전 없음/경계에서 멈춤/배회 없음)를 남겼다. CLAUDE.md에 이미 "시각적 문제는 실제 창+screencapture로 확인해도 된다"는 규칙이 추가되어 있었다(직전 커밋에서 반영). 세 문제 모두 하나의 inbox 번호 아래 있지만 서로 독립적인 수정이라, 우선순위대로 문제 1부터 진행했다.
+- 한 일:
+  - `scripts/animal.gd`: `_start_fleeing()` 끝에서 `_update_facing(flee_direction)`을 호출하도록 추가. `_update_facing()`은 `direction.x`의 절댓값이 0.01 미만(순수 상하 이동)이면 아무것도 하지 않고, 그 외에는 `sprite.flip_h = direction.x < 0.0`으로 설정한다. Godot에서 `Sprite2D.texture`와 `flip_h`는 독립 프로퍼티라, `_update_walk_animation()`이 정지(`deer_base.png`)/걷기(`deer_walk_*.png`) 텍스처를 오가도 `flip_h`는 그대로 유지된다 — 문제 1 지시문의 "정지 상태와 도주 애니메이션에 동일한 flip 로직을 적용해 최소한 자기 자신과는 일관되게 만들 것"을 이 방식으로 만족시켰다.
+  - `deer_base.png`/`deer_walk_00.png`를 Pillow로 확대해 나란히 비교해봤다(임시 스크립트, 저장 안 함) — 두 에셋 모두 카메라를 향한 비슷한 정면 포즈였고 "기본 정면 방향이 서로 다르다"고 볼 근거가 없어서, 지시문이 언급한 보정값(offset)은 추가하지 않았다.
+  - `tests/animal_facing_headless_test.gd`를 새로 만들어 회귀 검증을 추가했다: 플레이어가 동물 왼쪽에 있으면 도주 후 `flip_h == false`이고 정지 텍스처로 돌아온 뒤에도 유지되는지, 플레이어가 오른쪽에 있으면(`animal._start_fleeing()`을 직접 호출) `flip_h == true`가 되는지 확인한다. 두 번째 시나리오는 실제 발사 입력을 다시 시뮬레이션하지 않고 `_start_fleeing()`을 직접 호출했는데, 아래 CAUTION 참고.
+  - 시각 확인(CLAUDE.md가 새로 허용한 절차): `godot --path . -s res://tests/_tmp_facing_visual_probe.gd -- right|left`(임시 스크립트, 확인 후 삭제)로 사슴을 강제 도주시키고 카메라를 확대한 뒤, **`screencapture`가 이 환경에서 "could not create image from display" 에러로 실패해서** 대신 `root.get_viewport().get_texture().get_image().save_png(...)`로 엔진 내부에서 직접 렌더링된 프레임을 PNG로 저장하는 방식으로 대체했다(비-headless로 실행해 실제 OpenGL 렌더링은 됨, `OpenGL API 4.1 Metal` 로그로 확인). 두 방향의 스크린샷을 Pillow로 잘라 나란히 비교해 Read 도구로 직접 봤다 — 안테나(뿔) 음영이 미세하게 반전된 것을 확인해 `flip_h`가 실제로 적용됨을 확인했다. 확인 후 임시 스크립트/스크린샷 폴더를 삭제하고 `ps aux`로 godot 프로세스가 남아있지 않음을 확인했다.
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음.
+  - 새로 만든 `animal_facing_headless_test.gd`: `PASS`. 관련 기존 테스트 `animal_flee_headless_test`/`animal_sight_flee_headless_test`/`animal_sound_flee_headless_test`: 모두 `PASS`(회귀 없음).
+
+> [!CAUTION]
+> `animal_hunt_headless_test`/`animal_capture_headless_test`를 관련 테스트로 함께 돌려봤는데 `animal_hunt_headless_test`가 실패했다("1회 공격 후 체력 라벨이 기대한 값(69/100)이 아님, 실제: 38/100" — 즉 한 번만 쐈는데 두 번 맞은 것처럼 처리됨). 이번 세션 변경과 무관한지 확인하기 위해 `git stash`로 변경사항을 모두 되돌리고(이 저장소의 기존 커밋 상태) 같은 두 테스트를 다시 돌려봤더니, `animal_hunt_headless_test`는 변경 전 코드에서도 똑같이 실패했고(`38/100`, 동일한 메시지) `animal_capture_headless_test`는 변경 전 코드에서는 통과했다(간헐적) — status.md #54/#66이 이미 남긴 "fire 입력 이중 소비" 플레이키니스가 그대로 재현된 것으로, 이번 세션이 만든 `flip_h` 변경과는 무관하다고 확인했다(`git stash pop`으로 원상 복구). 이 결함 자체를 고치는 것은 이번 지시(inbox #13) 범위 밖이라 그대로 두었다 — 다만 계속 반복 관찰되는 만큼, 다음에 player.gd의 발사 입력 처리를 다룰 세션이 있다면 근본 원인(같은 물리 프레임 안에서 `is_action_just_pressed("fire")`가 두 번 참으로 평가되는 경로가 있는지)을 조사해서 고치는 걸 권장한다.
+
+- 남은 제약: `inbox.md` #13의 문제 2(경계에서 멈춤)와 문제 3(배회 없음)이 아직 미처리다 — 다음 세션이 이어서 처리해야 한다(문제 2/3은 서로 관련이 깊어 `terrain.get_island_bounds()` 경계 처리를 배회/도주가 공유하는 공용 함수로 만드는 걸 문제 2 처리 시 함께 고려할 것, inbox #13 원문 참고). `animal_hunt`/`animal_capture`의 fire 입력 이중 소비 플레이키니스(status.md #54/#66/#73 CAUTION 세 번째 관찰)도 여전히 미해결이며, 이번 세션에서 재확인용 근거를 추가로 남겼다. 그 외 기존 미해결 사항(원격 피어 애니메이션 미동기화, 나무/식물/물고기가 절차적 단색 사각형, 아이템 줍기/제작)도 그대로 남아있다.
+- 다음 할 일: `inbox.md` #13이 아직 완전히 처리되지 않았으므로(문제 1만 완료) 규칙 7의 HARNESS_STOP 조건(미처리 항목 없음)에 해당하지 않는다 — 다음 세션은 `inbox.md` #13의 문제 2(섬 경계에서 도주/배회가 멈추는 문제)부터 이어서 처리할 것.
+
