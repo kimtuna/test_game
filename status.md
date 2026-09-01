@@ -252,3 +252,24 @@
 
 > [!IMPORTANT]
 > HARNESS_STOP: inbox.md #5까지 모두 처리 완료 + 미처리 항목 없음 — 자동 루프를 여기서 멈춘다.
+
+---
+
+### #54 — 2026-09-02 03:09 (수동 실행, 사용자가 하네스 사이클 1회를 직접 요청)
+
+- 계기: `inbox.md` #6(미처리)을 이어받았다 — 사용자가 직접 플레이해보고 "총이 제대로 작동이 안된다"고 지적. 원인은 `status.md` #53이 만든 `facing_direction`(발사 조준 기준)이 실제로는 마우스 커서 방향이 아니라 "현재 이동 방향"으로 계산되고 있었던 것 — 마우스로 동물을 조준해 클릭해도 판정은 마지막으로 걸었던 방향 기준이라 조준과 무관하게 맞거나 빗나갔다. `inbox.md` #6은 우선순위 순으로 5개 항목을 나열했고 "여러 세션에 걸쳐 순서대로 처리할 것"이라고 명시했으므로, 규칙 4(기능 하나만)에 따라 `[최우선, 버그]`로 표시된 1번과, 같은 데이터(조준 방향)를 눈으로 검증하기 위한 시각적 짝인 2번(조준선 표시)까지를 이번 세션의 "하나"로 묶어 처리했다(둘 다 `[최우선]`이고, 조준선이 없으면 1번의 수정이 실제로 마우스를 따라가는지 사람이 확인할 방법이 없어 사실상 같은 조각이라고 판단). 3~5번(인벤토리, 장비 슬롯, 핫바)은 이번에 손대지 않았다.
+- 한 일:
+  - `scripts/player.gd`: 조준 판정과 조준선 표시 양쪽에 쓰는 단일 값 `aim_direction`을 새로 추가했다. 매 물리 프레임 `_update_aim_direction()`에서 갱신하는데, 헤드리스 환경(`DisplayServer.get_name() == "headless"`, `main_menu.gd`가 이미 쓰던 것과 동일한 패턴)에서는 실제 마우스 좌표가 없어 기존처럼 `facing_direction`(이동 방향)으로 대체하고, 그 외(실제 창이 있는 환경)에서는 `get_global_mouse_position() - global_position`을 정규화해 실제 마우스 커서 방향을 쓴다. `_find_fire_target()`이 참조하던 `facing_direction`을 `aim_direction`으로 바꿨다 — 이제 조준 판정 자체는 마우스 기준이 된다.
+  - 같은 파일에 `_draw()`를 추가해 플레이어 위치에서 `aim_direction * FIRE_RANGE` 방향으로 반투명 빨간 선을 그린다. 판정에 쓰는 값과 동일한 `aim_direction`을 그대로 그리므로 표시와 실제 판정이 항상 일치한다. authority가 아닌 원격 Player와 헤드리스 환경에서는 그리지 않는다(카메라/탄약 HUD와 동일한 이유).
+  - 창 스트레치 모드(`project.godot`의 `window/stretch/mode="canvas_items"`)가 걸려있어도 `get_global_mouse_position()`은 뷰포트의 캔버스 변환을 이미 반영한 월드 좌표를 반환하므로(Godot 4 표준 동작) 별도 좌표 변환은 필요하지 않았다.
+  - 조준선을 항상 보이게 할지, 특정 장비(총)를 들고 있을 때만 보이게 할지 고민했다 — design.md/inbox 어디에도 "총"이 별도 장착 슬롯으로 명시되어 있지 않고(현재는 좌클릭 발사가 곧 기본 상호작용이라 사실상 항상 "총을 들고 있는" 상태), 게이팅 조건을 새로 만들면 이번 지시(조준 정확성 버그 수정 + 시각적 확인) 범위를 넘어서는 새 결정이 되므로 authority인 로컬 플레이어에게는 항상 표시하는 쪽으로 판단했다.
+  - 헤드리스 테스트는 새로 추가하지 않았다 — 이번 변경의 핵심(마우스 좌표 기반 계산)은 헤드리스 환경에서 원천적으로 검증 불가능하고(다른 마우스/스트레치 관련 로직도 이 저장소에서 자동 QA 대상이 아니었다), 헤드리스 경로(`facing_direction`으로 대체)는 기존 `animal_ranged_hunt_headless_test`/`mouse_hunt_headless_test`가 그대로 검증한다(둘 다 `player.facing_direction`을 직접 설정해 조준을 통제하는 방식이라 `aim_direction`이 그 값을 그대로 이어받는지 자연히 확인됨).
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음).
+  - 이번 변경과 직접 관련된 테스트만 재실행(규칙 4 QA 지침): `animal_ranged_hunt_headless_test`(`PASS`), `mouse_hunt_headless_test`(`PASS`) — 둘 다 조준 방향(`aim_direction`, 헤드리스에서는 `facing_direction`과 동일)을 직접 검증하는 테스트로, 이름만 바뀌었을 뿐 판정 결과가 그대로 유지됨을 확인했다.
+  - `equipment_gate_headless_test`(`PASS`), `grade_headless_test`(`PASS`), `grade_reward_headless_test`(`PASS`), `animal_flee_headless_test`(`PASS`)도 함께 재확인했다 — 전부 점블랭크 거리(0)에서 발사해 각도 검사 자체를 건너뛰는 경로라 이번 변경의 영향을 받지 않아야 하며, 실제로 그대로 통과했다.
+
+> [!CAUTION]
+> QA 중 `animal_hunt_headless_test`와 `animal_capture_headless_test` 두 개가 실패(전자는 최초 실행 시 5분 넘게 멈춘 뒤 결국 FAIL, 후자는 즉시 FAIL)하는 것을 발견했다. 원인을 좁히기 위해 `git stash`로 이번 세션의 변경을 완전히 제거한 원래 코드에서 같은 두 테스트를 다시 돌려봤는데, 변경 전 코드에서도 동일하게 FAIL했다(`animal_hunt`: "1회 공격 후 체력 라벨이 기대한 값(69/100)이 아님(실제: 38/100)" — 즉 한 번의 fire 입력 사이클에서 공격이 두 번 들어감, `animal_capture`: 마취탄 발사 전에 이미 여러 발이 들어가 포획 시점에 체력이 예상과 달라짐). 즉 이번 세션이 만든 버그가 아니라, `Input.action_press`/`action_release` + `await process_frame`만으로 물리 프레임 타이밍을 흉내내는 기존 테스트 패턴 자체에 있던 사전 존재 플레이키니스(가끔 한 번의 "눌림"이 두 물리 프레임에 걸쳐 두 번 소비됨)로 판단했다. 이번 세션 범위(조준 방향 버그 수정)와 무관하고, 재현이 결정론적이지도 않아(같은 코드로 재실행하면 통과할 때도, 실패할 때도 있음) 이번 세션에서 고치지 않고 다음에 참고하도록 여기 남긴다. 다만 최초 실행에서 `animal_hunt_headless_test.gd` 프로세스(PID 56652)가 5분 넘게 멈춰 있다가 이 세션의 Bash 권한(`Bash(godot *)`만 허용, `kill`은 미허용)으로는 정리하지 못한 채 남아있을 수 있다 — 사용자가 직접 `kill`로 정리해야 할 수 있다.
+- 남은 제약: 조준선은 authority인 로컬 플레이어에게 항상 표시되며, 특정 장비를 들고 있을 때만 보이게 하는 게이팅은 없다(위 판단 근거 참고). `inbox.md` #6의 3번(인벤토리 E키 9칸)/4번(장비 슬롯 7종)/5번(핫바 1~5)은 아직 미착수 — "여러 세션에 걸쳐 순서대로 처리"가 명시된 지시라 다음 세션이 이어받아야 한다. 위 CAUTION의 `animal_hunt`/`animal_capture` 테스트 플레이키니스는 미해결 상태로 남아있다(원인은 좁혔으나 고치지는 않음).
+- 다음 할 일: 다음 세션은 `inbox.md` #6의 3번(인벤토리, E키, 9칸, 마인크래프트/코어키퍼 참고)부터 이어받을 것을 권장한다. 여유가 있다면 위 CAUTION에 남긴 `animal_hunt_headless_test`/`animal_capture_headless_test`의 fire 입력 이중 소비 플레이키니스 원인 조사(테스트의 `Input.action_press`/`action_release` 타이밍 문제로 추정)도 별도로 다뤄볼 만하다. `inbox.md` #6에 아직 3~5번이 남아있으므로 규칙 7에 따라 `HARNESS_STOP`을 남기지 않고 다음 세션이 계속 이어간다.
