@@ -66,3 +66,12 @@
   - `scripts/item.gd`: 동일한 방식으로 20x20 노란색(1.0, 0.85, 0.2) 텍스처를 생성해 아이템에 할당.
 - 확인: `godot --headless --path . --quit` 에러 없음. `godot --headless --path . --script res://tests/loop_headless_test.gd` 실행 결과 `HEADLESS_LOOP_TEST: PASS (score=Score: 3, clear=true)` — 텍스처 변경 후에도 이동→수집→점수→클리어 전체 루프가 정상 동작함을 재확인.
 - 다음 할 일: 이제 Player/Item이 실제 화면에서도 보이므로, 사람이 직접 에디터로 플레이해 조작감·시각적 배치(글자 겹침, 아이템 간격 등)를 확인하는 것을 권장한다. inbox.md에 새 지시가 없다면, 다음 세션은 design.md가 명시한 확장 범위(적, 타이머, 여러 레벨 등) 중 하나를 진행하기보다는— design.md가 "그 이후 확장은 inbox.md 지시가 내려온 뒤에 진행한다"고 명확히 제한하고 있으므로 — 사용자에게 다음 확장 방향(적 추가, 타이머, 레벨 확장, 사운드 등 범위 밖 항목 포함 여부)을 inbox.md를 통해 지시해 줄 것을 제안하는 상태로 대기하는 것이 맞다.
+
+---
+
+### #7 — 2026-09-01 (자동 세션)
+
+- 한 일 (inbox 미처리 항목 없음. status.md #6이 남긴 "시각적 배치 확인" 권고에 따라 `scenes/Main.tscn`의 아이템 간격(Player와 Item/Item2/Item3 사이 거리 187~368px, 뷰포트 1152x648 안에 모두 위치)과 `UI/ScoreLabel`·`UI/ClearLabel` 좌표(좌상단 vs 화면 중앙, 겹침 없음)를 직접 점검했으나 실질적인 배치 결함은 없었음. 대신 점검 과정에서 `project.godot`의 `config/name`이 `my-2d-game` 뼈대를 이식했던 #1 세션 이후 "My 2D Game"으로 그대로 남아 있어 design.md의 게임 제목("Test Game")과 불일치하는 것을 발견함 — 창 제목에 그대로 노출되는 부분이라 규칙 1(합격 기준: 리뷰해도 부끄럽지 않은가)에 어긋난다고 판단해 이번 세션의 작업으로 수정함):
+  - `project.godot`: `config/name`을 `"My 2D Game"` → `"Test Game"`으로 수정. 게임플레이 로직/씬 구조 변경 없음 (design.md가 금지한 확장 기능이 아니라 기존 결과물의 정합성 결함 수정).
+- 확인: `godot --headless --path . --quit` 에러 없음. `godot --headless --path . --script res://tests/loop_headless_test.gd` 실행 결과 `HEADLESS_LOOP_TEST: PASS (score=Score: 3, clear=true)` — 이름 변경이 게임 로직에 영향 없음을 확인.
+- 다음 할 일: design.md의 1차 완료 정의(스폰→수집→점수 표시→클리어)는 코드 검증 및 시각적 배치 점검까지 마쳤다고 판단한다. inbox.md에 새 지시가 없는 한, 다음 세션은 design.md가 명시적으로 제한한 확장 범위(적, 타이머, 여러 레벨, 사운드 등)를 임의로 진행하지 말고, 사용자에게 inbox.md를 통한 다음 방향 지시를 요청하는 상태로 대기한다.
