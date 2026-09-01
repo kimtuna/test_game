@@ -369,3 +369,20 @@
   - 이번 변경과 직접 관련된 테스트만 재실행(규칙 4 QA 지침): `slot_headless_test`(재작성 후 `PASS`), `pause_menu_headless_test`(`PASS` — 같은 `_unhandled_input` 오버레이 우선순위 체인에서 분기 하나를 제거한 변경이라 ESC 흐름이 깨지지 않았는지 확인), `save_load_headless_test`(`PASS` — 슬롯 저장/복원 자체가 Tab 제거로 영향받지 않는지 확인). `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(편집기로 열려있던 기존 프로세스 1개는 이번 세션 시작 전부터 떠 있던 것으로 무관함).
 - 남은 제약: `inbox.md` #7의 2번(상호작용을 전부 마우스 좌클릭으로 통일 — Tree/Plant/Fish의 `ui_accept`를 `fire`로 변경)과 3번(커스터마이징을 눈/피부색/머리카락 종류로 확장)은 아직 미착수 상태다. status.md #57/#58이 남긴 "아이템 줍기/제작", "핫바-상호작용 연결", "`animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스(status.md #54 CAUTION)"도 여전히 미해결이다.
 - 다음 할 일: 다음 세션은 `inbox.md` #7의 2번(상호작용 좌클릭 통일)을 이어서 처리한다 — `scripts/tree.gd`/`scripts/plant.gd`/`scripts/fish.gd`의 `Input.is_action_just_pressed("ui_accept")`를 `fire` 액션으로 바꾸되 `player_nearby` 근접 판정은 유지하는 방향(inbox #7 2번에 이미 사용자가 제안한 방향)으로 진행하면 된다. 그 다음 3번(커스터마이징 확장)까지 처리되면 `inbox.md` #7이 모두 처리 완료된다.
+
+---
+
+### #60 — 2026-09-02 03:57 (상호작용 좌클릭 통일, inbox #7 2번 처리)
+
+요약: `inbox.md` #7의 남은 2개 지시 중 2번(나무/식물/물고기 상호작용을 `ui_accept`에서 좌클릭(`fire`)으로 통일)을 규칙 4(기능 하나만)에 따라 이번 세션의 조각으로 처리했다. 사용자가 제안한 방향(근접 판정은 유지, 트리거 키만 변경) 그대로 반영했다.
+
+- 계기: `status.md` #59가 "다음 세션은 inbox #7 2번을 이어서 처리한다"고 명시적으로 남겼고, `inbox.md` #7이 여전히 부분 처리 상태(1번만 완료)였다.
+- 한 일:
+  - `scripts/tree.gd`/`scripts/plant.gd`/`scripts/fish.gd`의 `_process()`에서 `Input.is_action_just_pressed("ui_accept")`를 `Input.is_action_just_pressed("fire")`로 바꿨다. `player_nearby`(Area2D 근접) 판정 자체는 손대지 않았다 — 동물 사냥처럼 `player.gd`의 사거리/조준각 판정(`FIRE_RANGE`)을 새로 붙이지 않은 이유는, inbox #7 2번이 "나무/식물/물고기는 근접 도구라 총처럼 긴 사거리일 필요는 없다"고 명시적으로 판단해뒀기 때문이다 — 트리거 키(무엇을 누르면 되는가)만 통일하고, "무엇을 상호작용할 수 있는가"의 판정 방식은 대상 종류별로 다르게 유지했다.
+  - `tree.gd` 상단 주석을 갱신해 이번 변경의 근거(inbox #7 2번, 동물 사냥과 트리거 키를 통일하되 판정은 근접 유지)를 남기고, `plant.gd`/`fish.gd`에는 tree.gd를 참고하라는 짧은 주석만 남겨 중복 설명을 피했다.
+  - 이 트리거를 직접 사용하던 7개 헤드리스 테스트(`tree_harvest_headless_test.gd`, `plant_harvest_headless_test.gd`, `fish_harvest_headless_test.gd`, `grade_headless_test.gd`, `grade_reward_headless_test.gd`, `equipment_gate_headless_test.gd`, `save_load_headless_test.gd`)의 `Input.action_press/release("ui_accept")` 호출과 관련 주석/에러 메시지를 전부 `"fire"` 기준으로 갱신했다. (`animal_hunt_headless_test.gd` 등 동물 관련 테스트는 이미 `fire`를 쓰고 있어 손대지 않았다.)
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음).
+  - 이번 변경과 직접 관련된 테스트 7개를 개별 실행(규칙 4 QA 지침 — Bash 도구가 셸 변수 치환이 들어간 for 루프 명령을 거부해 부득이 파일별로 하나씩 실행함): `tree_harvest_headless_test`(PASS), `plant_harvest_headless_test`(PASS), `fish_harvest_headless_test`(PASS), `equipment_gate_headless_test`(PASS), `grade_headless_test`(PASS), `grade_reward_headless_test`(PASS), `save_load_headless_test`(PASS) 모두 통과. `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(에디터로 이미 열려있던 기존 프로세스 2개는 세션 시작 전부터 떠 있던 것으로 무관함).
+- 남은 제약: `inbox.md` #7의 3번(캐릭터 커스터마이징을 눈/피부색/머리카락 종류로 확장)이 아직 미착수다. status.md #57/#58이 남긴 "아이템 줍기/제작", "핫바-상호작용 연결", "`animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스(status.md #54 CAUTION)"도 여전히 미해결이다.
+- 다음 할 일: 다음 세션은 `inbox.md` #7의 3번(커스터마이징을 눈/피부색/머리카락 종류로 확장, 저장/불러오기에도 슬롯별로 반영)을 이어받는다. 이 항목까지 처리되면 `inbox.md` #7이 모두 처리 완료되어, 규칙 7에 따라 다음 세션이 `HARNESS_STOP`을 남기고 멈출 조건이 된다(단, 그 전에 사용자가 새 지시를 추가하면 그것이 우선).
