@@ -165,3 +165,18 @@
 - 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음). `godot --headless --path . --script res://tests/boundary_headless_test.gd` 실행 결과 `HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)` — Player가 섬 중심에서 오른쪽으로 계속 이동해도 경계(1576) 안쪽 1560에서 멈춰, 벽에 막혀 바다로 못 나감을 확인. (반경 16px인 Player 충돌 박스 절반만큼 안쪽에서 멈추는 것은 물리적으로 정확한 동작.)
 - 남은 제약: 이번 테스트는 오른쪽 방향 하나만 검증했다. 상/하/좌 방향 벽도 동일한 코드 경로(`_create_boundary_walls`)로 생성되므로 로직상 대칭적으로 동작할 것으로 예상하지만, 사람이 에디터로 네 방향 모두 실제로 막히는지 시각적으로 확인하는 것을 권장한다.
 - 다음 할 일: design.md 로드맵의 "섬 기본 지형" 단계가 경계 충돌까지 포함해 마무리되었다고 판단한다. 다음 단계는 **채집/사냥/포획**이다. 아직 아무 채집/사냥 대상이 없으므로, 가장 작은 단위로는 섬 안에 "나무" 1종(등급 없이 최소 1개체) 오브젝트를 배치하고 상호작용(예: 근접 후 특정 키 입력 시 사라짐/자원 획득 등 최소한의 동작) 중 가장 단순한 조각 하나만 구현하는 것을 권장한다. design.md의 등급 체계·장비는 아직 범위 밖이므로 이번엔 손대지 않는다.
+
+---
+
+### #16 — 2026-09-01 (자동 세션)
+
+- 계기: inbox.md에 미처리 항목 없음. status.md #15가 남긴 다음 할 일(채집/사냥/포획의 첫 조각 — 나무 1종 배치 + 최소 상호작용)을 그대로 이어받음.
+- 한 일:
+  - `scripts/tree.gd` 신설: `Area2D` 기반. `body_entered`/`body_exited`로 `player` 그룹 멤버가 상호작용 범위(반경 60px 원형 `CollisionShape2D`)에 들어왔는지 추적(`player_nearby`)하고, 범위 안에서 `ui_accept`(기본 키: Space/Enter)를 누르면 `queue_free()`로 나무를 없애고 `print()`로 획득 메시지를 남긴다. 트렁크(갈색 사각형)+캐노피(초록 사각형)를 `Image`로 절차적으로 그려 `Sprite2D` 텍스처에 할당 — 기존 player.gd/terrain.gd가 써온 "코드로 절차적 텍스처 생성" 패턴을 그대로 따름.
+  - 커스텀 입력 액션을 새로 만들지 않고 Godot 기본 액션인 `ui_accept`를 상호작용 키로 재사용했다. 근거: `project.godot`의 `[input]` 섹션에 `InputEventKey` 리소스를 수동으로 작성하면 형식 오류를 내기 쉽고, `ui_accept`(Space/Enter)는 이미 기본 입력맵에 있어 "채집 가능 여부를 알리는 최소 UI(예: 안내 문구)가 아직 없는" 현재 단계에서 상식적인 기본값으로 충분하다고 판단. 전용 "상호작용" 키 바인딩이 필요해지면(다른 액션과 겹치기 시작하면) 이후 세션에서 커스텀 액션으로 분리하면 된다.
+  - `scenes/Tree.tscn` 신설: `Area2D`("Tree") + `Sprite2D` + 원형 `CollisionShape2D`(반지름 60).
+  - `scenes/Main.tscn`: `Tree` 인스턴스 1개를 섬 안쪽, Player 시작 위치(576,324)와 겹치지 않는 (900,500)에 배치.
+  - `tests/tree_harvest_headless_test.gd` 신설: `Main.tscn`을 인스턴스화해 (1) 상호작용 범위 밖에서 `ui_accept`를 눌러도 나무가 사라지지 않는지, (2) Player를 나무 위치로 이동시켜 범위 안에 들어간 뒤 `player_nearby`가 채워지는지, (3) 그 상태에서 `ui_accept`를 누르면 실제로 나무가 트리에서 제거되는지를 검증.
+- 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음). `godot --headless --path . --script res://tests/tree_harvest_headless_test.gd` 실행 결과 `HEADLESS_TREE_HARVEST_TEST: PASS`(콘솔에 "나무를 채집했다: 통나무 x1" 출력 확인). 기존 `godot --headless --path . --script res://tests/boundary_headless_test.gd`도 `HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)`로 재확인해 섬 경계 충돌 로직에 회귀가 없음을 검증.
+- 남은 제약: 채집 시 자원 획득이 `print()` 콘솔 출력뿐이고, 화면에 보이는 UI(인벤토리, 획득 알림)나 실제 자원 카운트 저장은 아직 없다. 등급 시스템(design.md 명시)도 이 나무에는 아직 없어 항상 한 번에 채집된다. 이런 부분은 design.md 로드맵상 "등급·장비" 단계 및 그 이후에 다룰 범위라 이번 세션에서는 의도적으로 손대지 않았다.
+- 다음 할 일: 채집/사냥/포획 단계를 계속 이어가려면, 다음으로 작은 단위 후보는 (1) 나무 채집 결과를 화면에서 확인 가능하게 만드는 최소 UI(예: 획득 시 잠깐 뜨는 텍스트, 또는 좌상단 통나무 개수 표시), 또는 (2) design.md가 언급한 "동물" 쪽 첫 조각(예: 도망 없이 고정된 동물 1종을 배치해 사냥 상호작용의 뼈대만 우선 만들기) 중 하나다. 사람이 에디터로 직접 플레이해 나무에 다가가 Space/Enter로 채집되는 조작감을 확인하는 것도 권장한다. inbox.md에 새 지시가 없다면 다음 세션은 이 중 하나를 규칙 4(기능 하나만)에 따라 골라 진행한다.
