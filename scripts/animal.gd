@@ -47,6 +47,11 @@ extends Area2D
 # 규칙으로 동작한다. MAX_HEALTH라는 이름은 기존 헤드리스 테스트가
 # `animal.MAX_HEALTH`로 직접 참조하고 있어 grade=1 기준값(기본 개체 100)으로
 # 그대로 유지했다.
+#
+# "장비" 단계 첫 조각으로, Player의 장비 슬롯(player.gd의 equipment)이 비어
+# 있으면 공격/포획이 진행되지 않는다. 공격은 "tool"(도끼) 슬롯을, 포획은
+# "weapon"(마취총) 슬롯을 요구한다 — 지금까지 ui_accept가 채집·공격을,
+# capture 액션이 포획을 담당해온 키 구분을 그대로 장비 슬롯 구분에 대응시켰다.
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -142,6 +147,9 @@ func _physics_process(delta: float) -> void:
 		is_fleeing = false
 
 func _attack() -> void:
+	if not player_nearby.has_equipped("tool"):
+		print("도구가 없어 공격할 수 없다.")
+		return
 	health -= ATTACK_DAMAGE
 	print("동물을 공격했다. 남은 체력: %d" % health)
 	if health <= 0:
@@ -163,6 +171,9 @@ func _start_fleeing(threat: Node2D = null) -> void:
 		flee_direction = Vector2.RIGHT
 
 func _try_capture() -> void:
+	if not player_nearby.has_equipped("weapon"):
+		print("마취총이 없어 포획할 수 없다.")
+		return
 	if health < max_health * CAPTURE_HEALTH_RATIO:
 		print("동물을 포획했다.")
 		captured.emit("동물")

@@ -11,6 +11,11 @@ extends Area2D
 # 시간/확률 시스템 없이 "몇 번 더 상호작용해야 하는가"만으로 난이도를
 # 표현하는 상식적 기본값이다. 등급별 보상(자원 종류/수량) 차등은 design.md에
 # 명시되지 않아 이번 조각에서는 다루지 않는다.
+#
+# "장비" 단계 첫 조각으로, Player에 새로 생긴 장비 슬롯(player.gd의
+# equipment["tool"])이 비어 있으면 상호작용 범위 안이라도 채집이 진행되지
+# 않는다 — design.md의 "장비를 맞춰 나간다"는 문장이 실제로 의미를 가지려면
+# 장비 없이는 아예 상호작용이 불가능해야 하기 때문이다.
 
 signal harvested(resource_name: String, amount: int)
 
@@ -42,6 +47,9 @@ func _process(_delta: float) -> void:
 		_register_hit()
 
 func _register_hit() -> void:
+	if not player_nearby.has_equipped("tool"):
+		print("도끼가 없어 채집할 수 없다.")
+		return
 	hits_taken += 1
 	if hits_taken >= grade:
 		_harvest()
