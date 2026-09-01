@@ -180,3 +180,17 @@
 - 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음). `godot --headless --path . --script res://tests/tree_harvest_headless_test.gd` 실행 결과 `HEADLESS_TREE_HARVEST_TEST: PASS`(콘솔에 "나무를 채집했다: 통나무 x1" 출력 확인). 기존 `godot --headless --path . --script res://tests/boundary_headless_test.gd`도 `HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)`로 재확인해 섬 경계 충돌 로직에 회귀가 없음을 검증.
 - 남은 제약: 채집 시 자원 획득이 `print()` 콘솔 출력뿐이고, 화면에 보이는 UI(인벤토리, 획득 알림)나 실제 자원 카운트 저장은 아직 없다. 등급 시스템(design.md 명시)도 이 나무에는 아직 없어 항상 한 번에 채집된다. 이런 부분은 design.md 로드맵상 "등급·장비" 단계 및 그 이후에 다룰 범위라 이번 세션에서는 의도적으로 손대지 않았다.
 - 다음 할 일: 채집/사냥/포획 단계를 계속 이어가려면, 다음으로 작은 단위 후보는 (1) 나무 채집 결과를 화면에서 확인 가능하게 만드는 최소 UI(예: 획득 시 잠깐 뜨는 텍스트, 또는 좌상단 통나무 개수 표시), 또는 (2) design.md가 언급한 "동물" 쪽 첫 조각(예: 도망 없이 고정된 동물 1종을 배치해 사냥 상호작용의 뼈대만 우선 만들기) 중 하나다. 사람이 에디터로 직접 플레이해 나무에 다가가 Space/Enter로 채집되는 조작감을 확인하는 것도 권장한다. inbox.md에 새 지시가 없다면 다음 세션은 이 중 하나를 규칙 4(기능 하나만)에 따라 골라 진행한다.
+
+---
+
+### #17 — 2026-09-01 11:39 (자동 세션)
+
+- 계기: inbox.md에 미처리 항목 없음. status.md #16이 남긴 두 후보(채집 결과 최소 UI vs 동물 첫 조각) 중, 규칙 4(기능 하나만)에 따라 "채집 결과를 화면에서 확인 가능하게 만드는 최소 UI"를 선택해 진행함 — 이미 구현된 나무 채집 기능의 완성도를 높이는 쪽이 새로운 상호작용 대상(동물)을 시작하는 것보다 더 작은 단위라고 판단.
+- 한 일:
+  - `scripts/tree.gd`: `harvested(resource_name: String, amount: int)` 시그널 추가. `_harvest()`에서 `queue_free()` 전에 `harvested.emit("통나무", 1)`을 emit하도록 변경.
+  - `scripts/main.gd` 신설: `Main`(Node2D) 루트에 부착. `_ready()`에서 `harvestable` 그룹(현재는 Tree)의 모든 노드에 대해 `harvested` 시그널을 구독하고, `inventory: Dictionary`에 자원명별 개수를 누적한 뒤 `UI/InventoryLabel` 텍스트를 "자원명: 개수" 형식(줄바꿈으로 여러 자원 구분)으로 갱신. 인벤토리가 비어 있으면(아직 아무것도 채집하지 않았으면) 라벨을 빈 문자열로 둬 화면에 불필요한 텍스트가 뜨지 않게 함.
+  - `scenes/Main.tscn`: `main.gd`를 Main 노드 스크립트로 연결. `UI`(CanvasLayer) + `UI/InventoryLabel`(Label, 좌상단 offset 16,16~300,100, 폰트 크기 24) 추가.
+  - `tests/tree_harvest_headless_test.gd`: 기존 채집 성공/실패 검증에 이어, 채집 후 `UI/InventoryLabel.text`가 "통나무: 1"인지 확인하는 검증을 추가.
+- 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음). `godot --headless --path . --script res://tests/tree_harvest_headless_test.gd` 실행 결과 `HEADLESS_TREE_HARVEST_TEST: PASS`(라벨 텍스트 검증 포함). `godot --headless --path . --script res://tests/boundary_headless_test.gd` 실행 결과 `HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)` — 섬 경계 충돌 로직 회귀 없음 재확인.
+- 남은 제약: 인벤토리는 세션 중 메모리에만 존재하며(저장/불러오기 없음), 자원 종류가 늘어나도 대응 가능한 구조이지만 아직 통나무 하나뿐이라 다중 자원 표시(줄바꿈 레이아웃)는 실제 화면에서 시각적으로 확인되지 않았다. design.md의 등급 시스템도 여전히 미적용.
+- 다음 할 일: design.md 로드맵상 채집/사냥/포획 단계를 계속 진행한다면, 다음 후보는 design.md가 언급한 "동물" 쪽 첫 조각(예: 도망 트리거 없이 고정된 동물 1종을 배치해 사냥/포획 상호작용의 뼈대만 우선 만들기)이 자연스럽다 — 채집(나무) 쪽은 최소 UI까지 갖춰졌으므로, 이제 사냥/포획이라는 다른 축의 첫 조각을 시작할 차례. 사람이 에디터로 직접 플레이해 인벤토리 라벨이 실제로 잘 보이는지(폰트 크기, 위치, 여러 줄일 때 겹침 여부) 확인하는 것도 권장한다. inbox.md에 새 지시가 없다면 다음 세션은 이 방향으로 진행한다.
