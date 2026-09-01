@@ -12,6 +12,6 @@ func _ready() -> void:
 	sprite.texture = ImageTexture.create_from_image(image)
 
 func _on_body_entered(body: Node2D) -> void:
-	if body is CharacterBody2D:
+	if body.is_in_group("player"):
 		collected.emit()
 		queue_free()

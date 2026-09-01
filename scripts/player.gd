@@ -5,6 +5,7 @@ const SPEED := 300.0
 @onready var sprite: Sprite2D = $Sprite2D
 
 func _ready() -> void:
+	add_to_group("player")
 	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.2, 0.6, 1.0))
 	sprite.texture = ImageTexture.create_from_image(image)
