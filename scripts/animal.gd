@@ -21,10 +21,20 @@ extends Area2D
 # 범위 안에서 끊임없이 미세 진동하며 도망다니는 부자연스러운 동작을 피하기
 # 위함이다. 다시 도주하려면 일단 시야에서 벗어났다가 재진입해야 한다.
 #
-# 발소리 감지는 여전히 미구현이다 — "발소리"라는 개념(이동 중 여부, 별도
-# 반경) 자체를 새로 정의해야 해 이번 조각의 범위를 넘어선다.
+# 발소리 감지("SoundArea", 반경 250)를 마지막 도주 트리거로 추가했다. 시야
+# 감지와 달리 "정지해 있으면 감지되지 않는다"는 조건이 핵심이라, 진입
+# 이벤트 한 번으로 즉시 트리거하지 않고 매 물리 프레임 player_in_sound_range
+# 대상의 velocity(CharacterBody2D 내장 속성)가 0보다 큰지(이동 중인지) 확인해
+# 도주를 시작한다. 반경을 SightArea(180)보다 넓게(250) 잡은 것은 이번
+# 세션의 판단이다 — 두 영역이 SightArea ⊂ SoundArea 관계였다면(예: 120반경)
+# 플레이어가 걸어서 접근할 때는 반드시 SoundArea보다 먼저 SightArea를
+# 지나가므로 시야 감지가 항상 먼저 발동해 발소리 감지가 사실상 죽은 코드가
+# 된다. "발소리는 눈으로 보기 전에 먼저 들린다"는 상식에 맞게 반경을 시야보다
+# 넓게 잡아, 정지한 동물이 이동 중인 플레이어를 시야보다 먼저 소리로
+# 감지하는 시나리오가 실제로 발생하도록 했다.
 #
-# 공격받아 죽지 않고 살아남으면(피격 도주) 또는 시야에 처음 들어오면(시야
+# 공격받아 죽지 않고 살아남으면(피격 도주), 시야에 처음 들어오면(시야
+# 도주), 또는 이동 중인 플레이어가 발소리 감지 범위 안에 있으면(발소리
 # 도주) 플레이어 반대 방향으로 FLEE_DURATION초 동안 FLEE_SPEED 속도로
 # 이동한다. 포획 시도(capture, 마취총)는 피해를 주는 "공격"이 아니라 별도
 # 행동이므로 도주를 유발하지 않는다.
@@ -41,6 +51,7 @@ const FLEE_DURATION: float = 0.6
 var health: int = MAX_HEALTH
 var player_nearby: CharacterBody2D = null
 var player_in_sight: CharacterBody2D = null
+var player_in_sound_range: CharacterBody2D = null
 var is_fleeing: bool = false
 var flee_timer: float = 0.0
 var flee_direction: Vector2 = Vector2.ZERO
@@ -49,6 +60,7 @@ var terrain: Node = null
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var health_label: Label = $HealthLabel
 @onready var sight_area: Area2D = $SightArea
+@onready var sound_area: Area2D = $SoundArea
 
 func _ready() -> void:
 	add_to_group("harvestable")
@@ -57,6 +69,8 @@ func _ready() -> void:
 	body_exited.connect(_on_body_exited)
 	sight_area.body_entered.connect(_on_sight_body_entered)
 	sight_area.body_exited.connect(_on_sight_body_exited)
+	sound_area.body_entered.connect(_on_sound_body_entered)
+	sound_area.body_exited.connect(_on_sound_body_exited)
 	sprite.texture = _create_animal_texture()
 	_update_health_label()
 	terrain = get_tree().get_first_node_in_group("terrain")
@@ -80,6 +94,14 @@ func _on_sight_body_exited(body: Node2D) -> void:
 	if body == player_in_sight:
 		player_in_sight = null
 
+func _on_sound_body_entered(body: Node2D) -> void:
+	if body.is_in_group("player"):
+		player_in_sound_range = body
+
+func _on_sound_body_exited(body: Node2D) -> void:
+	if body == player_in_sound_range:
+		player_in_sound_range = null
+
 func _process(_delta: float) -> void:
 	if player_nearby == null:
 		return
@@ -90,7 +112,10 @@ func _process(_delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	if not is_fleeing:
-		return
+		if player_in_sound_range != null and player_in_sound_range.velocity.length() > 0.0:
+			_start_fleeing(player_in_sound_range)
+		else:
+			return
 	global_position += flee_direction * FLEE_SPEED * delta
 	if terrain != null:
 		var bounds: Rect2 = terrain.get_island_bounds()
