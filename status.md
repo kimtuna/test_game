@@ -245,3 +245,26 @@
   - `git status`로 의도한 파일(`assets/sprites/animal/deer_base.png`) 하나만 스테이징됐는지 확인 후 커밋.
 - 남은 제약: `assets/sprites/animal/deer_base.png`는 아직 `scripts/animal.gd`/`scenes/Animal.tscn`에 반영되지 않았다 — `_create_animal_texture()`가 여전히 40×32 단색 사각형을 절차적으로 그린다(`inbox.md` #9 4번 범위, 이번 세션에서 의도적으로 건드리지 않음). 걷기 애니메이션(#9 3번)도 아직 생성 전이다. `inbox.md` #10(해상도 설정 UI)은 여전히 미처리로 남아있다. status.md #57/#58/#61/#66이 남긴 기존 미해결 사항(아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스, 머리 종류 색상 선택 부재, 원격 피어 애니메이션 미동기화)도 그대로 남아있다.
 - 다음 할 일: `inbox.md` #9의 3번(이번에 채택한 `deer_base.png`를 참조 이미지로 `python3 tools/pixellab_gen.py --reference assets/sprites/animal/deer_base.png --action "walk" --width 40 --height 32 --strip`으로 걷기 애니메이션 생성 → Read로 스트립 확인)을 이어받거나, #9의 우선순위가 #10보다 앞서므로 순서상 3번이 다음이다. #9가 모두 끝난 뒤 #10(해상도 설정 UI, project.godot 정적 설정 대신 런타임 코드로 창 크기 지정)을 처리한다. `inbox.md`에 아직 미처리 항목(#9 3~5번, #10)이 남아있으므로 규칙 7의 `HARNESS_STOP` 조건에 해당하지 않는다 — 이번 세션은 멈추지 않고 정상 종료한다.
+
+---
+
+### #70 — 2026-09-02 05:06 (사슴 걷기 애니메이션 생성 + Godot 반영, inbox #9 3~4번 처리 — inbox #9 전체 완료)
+
+요약: `inbox.md` #9의 남은 두 조각(3번 걷기 애니메이션 생성, 4번 Godot 실제 반영)을 처리했다. PixelLab `animate-with-text-v2`로 `deer_base.png`를 참조 이미지 삼아 걷기 16프레임을 생성해 Read 도구로 확대 스트립을 직접 확인했고, `scripts/animal.gd`가 절차적 단색 사각형 대신 실제 사슴 텍스처(정지/걷기)를 로드해 표시하도록 바꿨다. QA 중 새로 추가한 PNG가 `.import` 파일 없이는 헤드리스 스크립트에서 아예 로드되지 않는다는 것을 발견했다 — 원인은 리소스 임포트 미실행이었고, 에디터를 한 번 headless로 띄워 해결했다.
+
+- 계기: `status.md` #69가 다음 세션은 `inbox.md` #9의 3번(걷기 애니메이션)을 이어받으라고 명시했다. 세션 시작 시 `GET /balance`로 크레딧을 재확인 — Tier 1 활성 상태(1975/2000 잔여, 이전 세션이 첫 사슴 생성에 25 정도 사용한 것으로 추정)로 여전히 사용 가능함을 확인하고 진행했다.
+- 한 일:
+  - `python3 tools/pixellab_gen.py --reference assets/sprites/animal/deer_base.png --action "walking" --width 40 --height 32 --strip`로 `/animate-with-text-v2`를 실제 호출 — 캔버스가 42 이하(40×32)라 문서대로 16프레임이 반환됐다(status.md #68이 조사해둔 "32~64px → 16프레임" 규칙과 일치, `animate()`가 mock 검증만 거쳤던 것을 실제 API로 처음 검증 — 코드 수정 없이 그대로 동작함).
+  - `strip.png`(작은 스케일)로는 다리/뿔의 프레임 간 차이가 잘 안 보여, 8배 확대 후 8프레임씩 둘로 나눈 별도 이미지를 만들어 Read 도구로 직접 확인했다 — 몸통/뿔 비례가 프레임마다 흔들리지 않고 일정했고, 다리 위치가 프레임마다 자연스럽게 바뀌며 걷는 인상을 줬다(재생성 없이 채택).
+  - 채택한 16프레임을 `assets/sprites/animal/deer_walk_00.png`~`deer_walk_15.png`로 저장(`ART_STYLE.md` 파일 구성 규칙에 맞춰 `assets/sprites/<category>/` 아래).
+  - `scripts/animal.gd`: `BASE_TEXTURE_PATH`/`WALK_FRAME_PATH_FORMAT`(16장)를 `_ready()`에서 `load()`해 `base_texture`/`walk_frames` 배열에 채우고, `sprite.texture`를 절차적 `_create_animal_texture()`(삭제) 대신 이걸로 초기화했다. `player.gd`의 걷기 애니메이션 패턴(`WALK_FRAME_DURATION`마다 프레임 순환, 멈추면 즉시 기본 프레임 복귀)을 그대로 재사용한 `_update_walk_animation(delta, moving)`을 추가했는데, 이 동물은 입력으로 움직이는 게 아니라 `is_fleeing` 상태일 때만 실제로 이동하므로 `moving` 인자에 `is_fleeing`을 그대로 넘기도록 판단했다(player처럼 별도 이동 입력 판정이 없다). `_physics_process`의 조기 반환 분기(도주 트리거 없이 정지 상태)에도 `_update_walk_animation(delta, false)`를 넣어, 도주가 끝나 정지할 때 항상 기본 텍스처로 복귀하도록 했다.
+  - `WALK_FRAME_DURATION`은 player(0.12초, 4프레임)와 달리 0.08초로 잡았다 — 프레임이 16장으로 더 많아 같은 속도감을 내려면 프레임당 시간을 줄여야 한다는 판단(4프레임×0.12초=0.48초 주기와 16프레임×0.08초=1.28초 주기는 정확히 같은 배율은 아니지만, 프레임이 촘촘한 만큼 프레임당 시간을 더 짧게 잡아야 걷는 속도가 부자연스럽게 느려지지 않는다고 판단했다 — `FLEE_DURATION`(0.6초) 동안 한 바퀴를 다 돌지 못하더라도, 다음 도주 때 이어서 재생되므로 문제 없다).
+- 확인:
+  - `godot --headless --path . --quit` 통과.
+  - 이번 변경과 직접 관련된 테스트 재실행(규칙 4): `animal_flee_headless_test`(PASS), `animal_hunt_headless_test`(PASS), `animal_capture_headless_test`(PASS), `animal_sight_flee_headless_test`(PASS), `animal_sound_flee_headless_test`(PASS), `animal_ranged_hunt_headless_test`(PASS) — 애니메이션 로직이 `_physics_process` 흐름 자체를 건드려 동물 스크립트를 쓰는 테스트 전부를 관련 범위로 판단해 돌렸다.
+
+> [!CAUTION]
+> `scripts/animal.gd`에 `load(BASE_TEXTURE_PATH)`/`load(WALK_FRAME_PATH_FORMAT % i)`를 추가한 뒤 `animal_hunt_headless_test`를 처음 돌렸을 때 `ERROR: No loader found for resource: res://assets/sprites/animal/deer_walk_12.png`(그리고 13~15번도 동일)가 나면서, 그 여파로 애니메이션 로딩 도중 물리 프레임이 밀려 `동물을 공격했다` 로그가 기대와 다른 체력 값을 찍는 것처럼 보이는 `FAIL`이 함께 발생했다 — 원인은 새로 추가한 PNG들에 Godot의 `.import` 리소스 메타 파일이 아직 생성되지 않아서였다(`find assets -name "*.import"`로 확인 — 기존에 커밋된 `body_base.png.import` 하나만 있었고 이번에 추가한 파일들은 전혀 없었음). `godot --headless --editor --quit --path .`로 프로젝트를 한 번 임포트시켜 `.import` 파일들을 생성한 뒤 재실행하니 로더 에러와 `FAIL` 둘 다 사라졌다(체력 시퀀스 100→69→38→7→포획/사냥 정상). 새 PNG 에셋을 커밋할 때는 반드시 `.import` 파일도 함께 커밋해야 한다는 것을 이번에 배웠다 — 이전 세션이 만든 `assets/sprites/player/body_base.png.import`도 그동안 커밋되지 않은 채 방치돼 있던 것을 발견해 이번 커밋에 함께 포함시켰다(같은 원인이라 별도 세션으로 미루지 않고 바로 처리).
+
+- 남은 제약: 현재 게임에 동물 종류가 사슴 하나뿐이라(`scenes/Main.tscn`에 Animal 인스턴스 1개) `animal.gd`의 텍스처 경로를 사슴 전용으로 하드코딩했다 — 다른 동물 종류가 추가되면 텍스처 셋을 파라미터화(예: `grade`나 별도 `species` 필드로 분기)해야 한다. 원격(비authority) 멀티플레이어 인스턴스에서 동물 애니메이션이 동기화되는지는 이번 세션에서 확인하지 않았다(플레이어 걷기 애니메이션도 status.md #66에서 로컬 전용으로 남아있던 것과 동일한 제약일 가능성이 높다 — 동물은 서버 authority가 이동을 계산하므로 클라이언트에서도 `is_fleeing`이 동기화 값이라면 애니메이션이 자연히 따라올 수 있으나 검증 전이다). 나무/식물/물고기는 여전히 절차적 단색 사각형이다. status.md #57/#58/#61/#66이 남긴 기존 미해결 사항(아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스, 머리 종류 색상 선택 부재)도 그대로 남아있다.
+- 다음 할 일: `inbox.md` #9(1~5번)가 이번 세션으로 전부 처리 완료됐다. `inbox.md`에는 아직 #10(해상도 설정 UI — 설정 메뉴에 해상도 선택 추가, `project.godot` 정적 설정 대신 런타임 코드로 창 크기 지정, 저장 시스템에 반영)이 미처리로 남아있다. 다음 세션은 `inbox.md` #10을 이어받는다. 미처리 항목이 남아있으므로 규칙 7의 `HARNESS_STOP` 조건에 해당하지 않는다 — 이번 세션은 멈추지 않고 정상 종료한다.

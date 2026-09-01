@@ -151,7 +151,7 @@ design.md를 "동물의 숲 스타일 나만의 섬" 기획으로 전면 교체�
 4. **Godot에 실제로 반영**: 생성된 사슴 정적 이미지/애니메이션 프레임을 `assets/sprites/`에 저장하고, 기존 `scenes/Animal.tscn`/`scripts/animal.gd`에 실제 텍스처로 반영한다(지금은 절차적 사각형일 것). 관련 헤드리스 테스트로 회귀 확인.
 5. **범위**: 이번 지시는 **동물**(사슴부터 시작해서 이후 다른 동물로 확장 가능)에 한정한다. **아이템(정적인 것)은 애니메이션이 필요 없다** — 후보 생성 후 1장 고르는 것까지만 하면 된다(움직이는 대상만 3번의 애니메이션 단계를 거친다). 플레이어 스프라이트를 PixelLab으로 다시 만드는 것, 무기/이펙트(총구 화염 등) 애니메이션은 이번 지시 범위 밖이다 — 나중에 별도 지시로 다룬다.
 
-상태: 부분 처리 (1번 PixelLab 생성 도구(tools/pixellab_gen.py, POST /generate-image-v2 + GET /background-jobs/{id} 폴링 + 비교 그리드 재사용)는 status.md #67에서 반영. 2번(사슴 정적 이미지 생성 — assets/sprites/animal/deer_base.png, #06 채택)은 status.md #69에서 반영(크레딧 문제는 inbox #10에서 해결 확인). 3~4번(애니메이션, Godot 반영)은 아직 미처리, 5번(범위 정의)은 방향 준수 중.)
+상태: 처리 완료 (1번 PixelLab 생성 도구는 status.md #67, 2번 사슴 정적 이미지 생성(#06 채택)은 status.md #69, 3번 걷기 애니메이션 생성(animate-with-text-v2, 16프레임) + 4번 Godot 반영(scripts/animal.gd가 실제 텍스처 로드)은 status.md #70에서 반영. 5번(범위를 동물로 한정)은 처음부터 끝까지 준수됨. 5개 항목 모두 반영 완료.)
 
 ---
 
