@@ -295,3 +295,24 @@
 > [!IMPORTANT]
 > HARNESS_STOP: inbox.md의 모든 항목(#1~#11)이 처리 완료됐고 design.md 로드맵도 각 항목 최소 구현+QA를 이미 통과한 상태라, 새 지시 없이 스스로 다음 작업을 고르지 않고 자동 루프를 멈춘다.
 
+---
+
+### #72 — 2026-09-02 05:23 (해상도 변경이 실제 창에 반영 안 되는 버그 수정, inbox #12 처리 — inbox 전체 처리 완료)
+
+요약: `inbox.md` #12(해상도를 골라도 실제 창 크기가 안 바뀌는 버그)를 처리했다. `game_settings.gd`의 `_apply_window_size()`가 창 "크기"만 코드로 지정하고 "화면비 유지 모드"/"기준 해상도"는 여전히 `project.godot`의 정적 `[display]` 설정에 의존하고 있었는데, 사용자가 실측한 대로 에디터가 그 섹션을 계속 지우는 문제와 맞물려 스트레치 계산이 꼬일 수 있었다 — `content_scale_mode`/`content_scale_aspect`/`content_scale_size`를 매번 코드로 명시적으로 강제하도록 고쳤다. QA 중 `get_window().size`/`content_scale_*` 프로퍼티는 `DisplayServer`의 실제 OS 창 제어 API(헤드리스에서 의미 없음)와 달리 헤드리스에서도 안전하게 읽고 쓸 수 있다는 걸 직접 확인했고, 기존에 있던 "헤드리스면 건너뛴다" 분기가 사실은 불필요했다는 것도 함께 드러났다.
+
+- 계기: `status.md` #71이 `HARNESS_STOP`을 남긴 뒤, 사용자가 직접 플레이하며 해상도 선택 UI가 나오긴 하는데 골라도 창 크기가 실제로 안 바뀌는 것을 발견해 `inbox.md` #12(2026-09-02 05:16)를 남겼다. 사용자는 원인 후보로 "화면비/기준 해상도가 여전히 `project.godot`의 정적 설정에 의존하고 있고, 에디터가 그 설정을 실시간으로 지우는 걸 다시 목격했다"고 적었다. `inbox.md`에 미처리 항목이 다시 생겼으므로 규칙 7에 따라 자동 루프를 재개하고, 이 항목(가장 오래된 유일한 미처리 항목)을 그대로 이어받았다.
+- 한 일:
+  - 먼저 원인 진단이 실제로 맞는지 직접 확인했다: `godot --headless --script`로 임시 스크립트를 만들어(`res://tests/_tmp_window_size_probe.gd`, 확인 후 삭제) `root.get_window()`에 `size`/`content_scale_mode`/`content_scale_aspect`/`content_scale_size`를 설정하고 다시 읽어보니, 헤드리스에서도 설정한 값이 그대로 반영됐다(에러 없음). 이는 기존 `_apply_window_size()`에 있던 `if DisplayServer.get_name() == "headless": return` 분기가, `main_menu.gd`의 `DisplayServer.window_get_mode()`/`window_set_mode()`(진짜 OS 창 제어 API, 헤드리스에서 의미 없음) 패턴을 그대로 따라한 것일 뿐, `Window` 노드의 프로퍼티 자체는 헤드리스에서도 안전하다는 걸 확인 안 하고 넘겨짚은 것이었다는 뜻이다.
+  - `scripts/game_settings.gd`: `BASE_RESOLUTION := Vector2i(1152, 648)`(기존 `DEFAULT_RESOLUTION_INDEX`가 가리키던 해상도와 동일 — 기존 체감 유지) 상수를 추가하고, `_apply_window_size()`가 매번 `window.content_scale_mode = CANVAS_ITEMS`, `content_scale_aspect = KEEP`, `content_scale_size = BASE_RESOLUTION`을 먼저 강제한 뒤 `window.size = RESOLUTIONS[resolution_index]`를 적용하도록 바꿨다. 헤드리스 스킵 분기는 삭제했다(단, `get_window()`가 아직 트리에 들어가기 전이라 `null`일 가능성은 `if window == null: return`으로 방어).
+  - `project.godot`의 `[display]` 설정(`window/stretch/mode`/`aspect`)은 그대로 남겨뒀다 — 지웠다 다시 생겨도 이제 코드가 매번 덮어쓰므로 참고용일 뿐 실제 동작을 좌우하지 않는다.
+  - `tests/game_settings_headless_test.gd`를 새로 만들어 (inbox #12 2번이 요구한) 회귀 검증을 추가했다: `GameSettings.RESOLUTIONS`의 각 인덱스에 대해 `set_resolution(i)`를 호출한 뒤 `get_window().size`가 실제로 그 값과 같은지, `content_scale_mode`/`aspect`/`size`가 매번 강제한 값(`CANVAS_ITEMS`/`KEEP`/`BASE_RESOLUTION`)을 유지하는지 확인한다.
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음.
+  - 이번 변경과 직접 관련된 테스트: 새로 만든 `game_settings_headless_test.gd`(`PASS`), 기존 `mainmenu_headless_test.gd`(해상도 드롭다운 선택 흐름을 이미 검증하던 테스트, 회귀 없이 `PASS`). `GameSettings`는 오토로드라 모든 헤드리스 테스트 부팅 시 `_ready()`가 실행되는데, 이번 변경으로 헤드리스에서도 `window.size`가 실제로 바뀌게 된 것이 다른 테스트(카메라/경계 판정 등)에 영향을 주는지 걱정돼 `boundary_headless_test.gd`도 추가로 돌려봤다 — `PASS`(final_x/island_right_edge 값 동일). `grep`으로 다른 스크립트/테스트가 `get_window()`나 `content_scale_*`, 실제 window 크기를 참조하는 곳이 없는지 확인했고(전부 게임 로직은 `content_scale_size`로 고정되는 논리 좌표계를 쓰지 실제 창 픽셀 크기를 안 쓴다), 없어서 이 변경이 다른 시스템에 파급되지 않는다고 판단했다. `ps aux`로 이번 세션이 새로 띄운 채 남은 godot 프로세스가 없는지 확인했다.
+- 남은 제약: 실제 화면에 창 크기가 시각적으로 잘 바뀌는지는 헤드리스 환경 특성상 여전히 사람이 직접 플레이해봐야 확인 가능하다(코드/헤드리스 프로퍼티 검증까지는 이번 세션에서 완료). `inbox.md` #12 3번("원인을 정확히 특정 못했다면 실제로 확인한 원인을 남길 것")에 따라 기록하자면 — 사용자의 진단(정적 `[display]` 설정 의존)이 부분적으로 유력한 원인이지만, 이번 조사로 추가로 드러난 것은 `_apply_window_size()`의 "헤드리스면 건너뛴다" 분기 자체는 실제 버그의 원인이 아니었다는 점이다(그 분기는 사람이 실제 창에서 겪은 문제와 무관 — 사람은 헤드리스가 아니라 실제 창에서 테스트했다). 즉 실제 원인은 사용자가 지목한 대로 "화면비/기준 해상도가 정적 설정에 남아있었던 것"으로 보이며, 이번 수정으로 그 의존을 제거했다. status.md #57/#58/#61/#66/#70/#71이 남긴 기존 미해결 사항(아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스, 원격 피어 애니메이션 미동기화, 나무/식물/물고기가 여전히 절차적 단색 사각형)도 그대로 남아있다.
+- 다음 할 일: `inbox.md`의 모든 항목(#1~#12)이 이번 세션으로 처리 완료됐다. design.md 로드맵도 여전히 각 항목 최소 구현+QA를 통과한 상태다. 규칙 7에 따라, 미착수/미해결로 남은 조각들(위 "남은 제약" 참고)은 세션이 스스로 골라 진행하지 않고 이 기록에 후보로만 남긴다. 특히 이번 수정이 실제 창에서 시각적으로 잘 동작하는지는 사용자가 직접 플레이해서 확인해줘야 한다 — 확인 후 문제가 남아있다면 `inbox.md`에 추가로 남겨달라. 사용자가 실제로 플레이해보고 `inbox.md`에 다음 지시를 남긴 뒤 하네스 데몬을 재기동해야 다음 실질적 작업이 시작된다.
+
+> [!IMPORTANT]
+> HARNESS_STOP: inbox.md의 모든 항목(#1~#12)이 처리 완료됐다. 이번에 고친 해상도/화면비 버그가 실제 화면에서 잘 동작하는지는 사람이 직접 확인해야 하므로, 그 결과를 기다리며 새 지시 없이 스스로 다음 작업을 고르지 않고 자동 루프를 멈춘다.
+
