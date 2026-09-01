@@ -55,6 +55,23 @@ const SLOT_KEYS: Dictionary = {
 # slot_colors: 슬롯 번호 -> 그 슬롯에서 마지막으로 고른 색. 아직 한 번도
 # 커스터마이징하지 않은 슬롯은 키 자체가 없어, 처음 선택 시 커스터마이징
 # 오버레이로 자연스럽게 이어진다.
+# design.md의 "멀티플레이(세션 서버 방식)" 로드맵의 다음 조각. status.md #32가
+# 만든 NetworkManager는 접속 자체(핸드셰이크)만 검증했고 실제 게임 오브젝트는
+# 아직 하나도 연결되어 있지 않았다. 이번 조각은 "위치 동기화 없이, 접속하면
+# 각자의 화면에 캐릭터가 나타난다"는 최소 수준까지만 다룬다 — 서버(호스트)가
+# peer_connected_to_me/peer_disconnected_from_me 시그널을 받아 Player 인스턴스를
+# 스폰/제거하면, Main.tscn에 새로 추가한 MultiplayerSpawner가 그 추가/제거를
+# 다른 접속자에게 자동으로 복제한다. 이동/애니메이션 동기화(MultiplayerSynchronizer)
+# 는 다음 단계로 미룬다.
+#
+# 자기 자신(호스트, peer id는 ENet 규약상 항상 1)은 기존과 동일하게 "Player"라는
+# 이름으로 스폰한다 — 지금까지 쌓인 12개의 헤드리스 테스트가 모두
+# `main.get_node("Player")`로 이 이름에 의존하고 있어, 이름을 바꾸면 멀티플레이와
+# 무관한 기존 회귀 테스트가 전부 깨지기 때문이다. 이후 접속하는 피어는
+# "Player_<id>"로 구분한다.
+const PLAYER_SCENE: PackedScene = preload("res://scenes/Player.tscn")
+const PLAYER_SPAWN_POSITION := Vector2(576, 324)
+
 var slot_colors: Dictionary = {}
 var current_slot: int = 0
 # pending_tutorial: 이번 세션에서 튜토리얼을 아직 한 번도 보여주지 않았는가.
@@ -63,6 +80,12 @@ var current_slot: int = 0
 var pending_tutorial: bool = true
 
 func _ready() -> void:
+	var network_manager := get_node("/root/NetworkManager")
+	network_manager.peer_connected_to_me.connect(_on_peer_connected)
+	network_manager.peer_disconnected_from_me.connect(_on_peer_disconnected)
+	if multiplayer.is_server():
+		_spawn_player(multiplayer.get_unique_id())
+
 	for node in get_tree().get_nodes_in_group("harvestable"):
 		node.harvested.connect(_on_harvested)
 	for node in get_tree().get_nodes_in_group("capturable"):
@@ -71,6 +94,28 @@ func _ready() -> void:
 	_update_capture_label()
 	_update_equipment_label()
 	slot_overlay.visible = true
+
+func _player_node_name(id: int) -> String:
+	return "Player" if id == 1 else "Player_%d" % id
+
+func _spawn_player(id: int) -> void:
+	var node_name := _player_node_name(id)
+	if has_node(node_name):
+		return
+	var player := PLAYER_SCENE.instantiate()
+	player.name = node_name
+	player.position = PLAYER_SPAWN_POSITION
+	add_child(player)
+
+func _on_peer_connected(id: int) -> void:
+	if multiplayer.is_server():
+		_spawn_player(id)
+
+func _on_peer_disconnected(id: int) -> void:
+	if multiplayer.is_server():
+		var node := get_node_or_null(_player_node_name(id))
+		if node:
+			node.queue_free()
 
 # design.md의 "캐릭터 슬롯"과 "캐릭터 외형을 커스터마이징할 수 있다"를 잇는
 # 최소 흐름. 시작 시 슬롯(1~3)을 고르면, 그 슬롯을 이번 세션에서 처음
