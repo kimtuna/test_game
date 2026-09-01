@@ -14,12 +14,14 @@ var health: int = MAX_HEALTH
 var player_nearby: CharacterBody2D = null
 
 @onready var sprite: Sprite2D = $Sprite2D
+@onready var health_label: Label = $HealthLabel
 
 func _ready() -> void:
 	add_to_group("harvestable")
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 	sprite.texture = _create_animal_texture()
+	_update_health_label()
 
 func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("player"):
@@ -40,6 +42,11 @@ func _attack() -> void:
 		print("동물을 사냥했다: 고기 x1")
 		harvested.emit("고기", 1)
 		queue_free()
+		return
+	_update_health_label()
+
+func _update_health_label() -> void:
+	health_label.text = "%d/%d" % [health, MAX_HEALTH]
 
 func _create_animal_texture() -> ImageTexture:
 	var image := Image.create(40, 32, false, Image.FORMAT_RGBA8)
