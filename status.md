@@ -450,3 +450,23 @@
   - `godot --headless --path . --quit` 에러 없음(GDScript 변경 없음, 규칙 4의 기본 체크로 수행). `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(에디터로 이미 열려있던 기존 프로세스 1개는 세션 시작 전부터 떠 있던 것으로 무관함).
 - 남은 제약: `inbox.md` #8의 3~5번(비교 그리드+Read 선택 표준 절차, 애니메이션 확인 루프, 플레이어 실제 적용)이 아직 미착수 — 지금 생성된 `player_body_base` 후보들은 어디까지나 도구 검증용이며 아직 게임에 적용되지 않았고 저장소에도 없다(gitignore). `TARGETS`에는 target이 하나뿐이라 동물/나무/아이템 등은 아직 생성 불가능하다. status.md #57/#58/#61이 남긴 "아이템 줍기/제작", "핫바-상호작용 연결", `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스(status.md #54 CAUTION), 머리 종류 색상 선택 부재도 여전히 미해결이다.
 - 다음 할 일: 다음 세션은 `inbox.md` #8의 3번(생성 → 비교 그리드 합성 → Read 도구로 시각 비교 → 선택, 근거를 `status.md`에 기록)을 이어받는다. `tools/sprite_gen.py`의 `generate()`가 반환하는 파일 목록을 그대로 활용해 그리드 합성 함수를 추가하는 방향이 자연스러워 보인다(이번 세션이 임시로 만든 "가로 스트립 이어붙이기" 코드가 참고가 될 것). `inbox.md` #8은 아직 부분 처리 상태이므로 규칙 7의 `HARNESS_STOP` 조건에 해당하지 않는다 — 이번 세션은 멈추지 않고 정상 종료한다.
+
+---
+
+### #64 — 2026-09-02 04:20 (후보 비교 그리드 도구 추가 + 첫 시각 비교/선택 실행, inbox #8 3번 처리)
+
+요약: `inbox.md` #8의 3번(생성 → 비교 그리드 합성 → Read 도구로 시각 비교 → 선택을 표준 절차로 만들기)을 처리했다. `tools/sprite_gen.py`에 `make_comparison_grid()`와 `--grid` CLI 플래그를 추가하고, `player_body_base` 10장을 실제로 생성해 비교 그리드 한 장으로 합친 뒤 Read 도구로 직접 열어 보고 후보 하나(`#08`)를 선정했다 — 선정 근거는 아래 "한 일"에 수치와 함께 남긴다.
+
+- 계기: `status.md` #63이 다음 세션은 `inbox.md` #8의 3번을 이어받으라고 명시했다. `inbox.md` #8은 1~2번만 처리된 상태였다.
+- 한 일:
+  - `tools/sprite_gen.py`에 `make_comparison_grid(files, out_path, scale=6, columns=5, label_h=14)`를 추가했다. 각 후보를 6배(`Image.NEAREST`만 사용 — 보간 금지, `ART_STYLE.md` 하드 엣지 규칙 유지)로 확대하고, 그리드 셀 아래 여백에 `#00`~`#09` 번호 라벨을 그려 어두운 배경(40,40,40) 위에 5열로 배치한다. 번호 라벨은 스프라이트 본체가 아니라 비교용 UI이므로 팔레트/외곽선 규칙 대상이 아니라는 점을 코드 주석에 남겼다.
+  - CLI에 `--grid` 플래그를 추가해 `generate()` 직후 `out_dir/comparison.png`를 만들도록 했다(`python3 tools/sprite_gen.py --target player_body_base --count 10 --grid`).
+  - 실제로 `player_body_base` 10장을 시드 `style_v1`로 생성하고 그리드를 만든 뒤, Read 도구로 `tools/sprite_candidates/player_body_base/comparison.png`를 직접 열어 10장을 눈으로 비교했다. 전부 같은 절차(머리 타원 + 몸통 타원, 좌상단 광원 하드 엣지 3톤)로 그려진 베이스 실루엣이라 차이는 미묘했지만, 머리-몸통 경계가 또렷하고 실루엣이 top-down 캐릭터 베이스로서 균형 잡혀 보이는 후보를 찾는 기준으로 봤다.
+  - 시각 비교와 함께, 각 후보를 생성한 시드값으로 실제 비례 수치도 재계산해(같은 `random.Random(f"{seed}:{i}")` 시드 방식이라 재현 가능) 판단 근거를 보강했다: `#08`은 head_ratio=0.372(10장 중 최대, top-down 캐릭터는 머리를 크게 그려야 작은 화면에서 식별하기 쉽다는 통상적인 픽셀아트 관례에 부합), body_width_ratio=0.637(과반 이상, 실루엣이 너무 마르지 않아 존재감이 있음), body_top_ratio=0.302(10장 평균 근처, 목 부분 여백이 머리-몸통을 시각적으로 분리할 만큼 확보됨). 그리드에서도 `#08`이 다른 후보 대비 머리가 크면서 몸통과 겹치지 않고 뚜렷이 분리돼 보였다. 이 근거로 `#08`을 이번 target의 대표 후보로 선정했다.
+  - 이 선정은 기록용 실행이며, 실제로 게임(`player.gd`)에 적용하지는 않았다 — `inbox.md` #8 5번(플레이어 캐릭터 첫 적용)이 다음 단계다. 재현을 위해 시드(`style_v1`)와 선택 인덱스(`08`)를 여기 기록해뒀으니, 다음 세션이 실제 적용 시 `python3 tools/sprite_gen.py --target player_body_base --count 10 --seed style_v1`로 동일한 `#08`을 다시 만들어낼 수 있다.
+- 확인:
+  - `python3 tools/sprite_gen.py --target player_body_base --count 10 --seed style_v1 --grid` 정상 동작, `comparison.png` 생성 확인.
+  - Read 도구로 `comparison.png`를 직접 열어 10장 모두 32x32 캔버스 규칙과 하드 엣지 3톤 규칙을 지키며 라벨이 잘리지 않고 정상적으로 표시되는 것을 확인.
+  - `godot --headless --path . --quit` 에러 없음(GDScript 변경 없음, 규칙 4의 기본 체크로 수행). `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(에디터로 이미 열려있던 기존 프로세스 1개는 세션 시작 전부터 떠 있던 것으로 무관함).
+- 남은 제약: `inbox.md` #8의 4~5번(애니메이션 자연스러움 확인 루프, 플레이어 실제 적용)이 아직 미착수다. `player_body_base`는 여전히 정적인 베이스 실루엣일 뿐, 손발/장비/색상 커스터마이징(피부색/눈/머리 종류)이 반영된 완성형 스프라이트가 아니다. `TARGETS`에는 target이 하나뿐이라 동물/나무/아이템 등은 아직 생성 불가능하다. status.md #57/#58/#61이 남긴 "아이템 줍기/제작", "핫바-상호작용 연결", `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스(status.md #54 CAUTION), 머리 종류 색상 선택 부재도 여전히 미해결이다.
+- 다음 할 일: 다음 세션은 `inbox.md` #8의 5번(첫 적용 대상: 플레이어 캐릭터의 정적 스프라이트를 피부/눈/머리 커스터마이징이 반영된 형태로 만들어 `assets/sprites/player/`에 채택, `player.gd`의 절차적 사각형 그리기를 실제 텍스처로 교체)을 이어받는다 — design.md/inbox #8 원문은 4번(애니메이션 확인 루프)을 5번보다 먼저 나열했지만, 5번이 "정적 스프라이트"부터 시작한다고 명시했으므로 정적 적용을 먼저 마친 뒤 다음 세션에서 걷기 애니메이션에 4번의 확인 루프를 적용하는 순서가 자연스럽다. `player_body_base #08`(시드 `style_v1`)을 베이스 실루엣으로 참고하되, `HAIR_STYLES`/`skin_color`/`eye_color` 커스터마이징을 실제 도트 그림에 반영하는 방법(예: target을 커스터마이징 옵션별로 세분화)을 이 단계에서 설계해야 한다. `inbox.md` #8은 아직 부분 처리 상태(4~5번 미착수)이므로 규칙 7의 `HARNESS_STOP` 조건에 해당하지 않는다 — 이번 세션은 멈추지 않고 정상 종료한다.
