@@ -113,6 +113,29 @@ const EYE_ROWS := [9, 11]
 const EYE_LEFT_X := [12, 14]
 const EYE_RIGHT_X := [18, 20]
 
+# inbox.md #8 4번: 움직이는 대상(플레이어)의 걷기 애니메이션. 몸이 눈사람형
+# (머리+몸통 타원, 팔다리 없음)이라 실제 다리를 그릴 수 없어, tools/sprite_gen.py
+# generate_walk_cycle()로 먼저 4프레임(컨택트-패싱-컨택트-패싱)을 만들어
+# frame_strip.png를 Read 도구로 직접 보고 확인한 방식을 그대로 옮겼다: (1)
+# 몸 전체를 dy만큼 위아래로 1px 튕기고, (2) 캔버스 하단에 신발 역할의 작은
+# 타원 두 개를 프레임마다 좁혔다/넓혔다 한다. IDLE_FRAME(dy=0, foot_dx=0)은
+# 정지 시의 중립 자세로, WALK_FRAMES와 별개다.
+const IDLE_FRAME: Dictionary = {"dy": 0, "foot_dx": 0}
+const WALK_FRAMES: Array[Dictionary] = [
+	{"dy": 0, "foot_dx": -2},
+	{"dy": -1, "foot_dx": 0},
+	{"dy": 0, "foot_dx": 2},
+	{"dy": -1, "foot_dx": 0},
+]
+const WALK_FRAME_DURATION := 0.12
+const FOOT_Y := [29, 32]
+const FOOT_HALF_WIDTH := 1.5
+const FOOT_CENTER_OFFSET := 3.0
+
+var is_walking: bool = false
+var walk_timer: float = 0.0
+var walk_frame_index: int = 0
+
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var camera: Camera2D = $Camera2D
 @onready var ammo_label: Label = $HUD/AmmoLabel
@@ -152,9 +175,13 @@ func _apply_appearance() -> void:
 	var skin_tones := _three_tone(skin_color)
 	var outfit_tones := _three_tone(OUTFIT_COLOR)
 
+	var frame: Dictionary = WALK_FRAMES[walk_frame_index] if is_walking else IDLE_FRAME
+	var dy: int = frame["dy"]
+	var foot_dx: int = frame["foot_dx"]
+
 	var head_r := 32.0 * HEAD_RATIO / 2.0
 	var head_cx := 16.0
-	var head_cy := 32.0 * HEAD_CENTER_Y_RATIO
+	var head_cy := 32.0 * HEAD_CENTER_Y_RATIO + dy
 	var head_x0 := roundi(head_cx - head_r)
 	var head_x1 := roundi(head_cx + head_r)
 	var head_y0 := roundi(head_cy - head_r)
@@ -164,16 +191,18 @@ func _apply_appearance() -> void:
 	var body_w := 32.0 * BODY_WIDTH_RATIO
 	var body_x0 := roundi((32.0 - body_w) / 2.0)
 	var body_x1 := roundi((32.0 + body_w) / 2.0)
-	var body_y0 := roundi(32.0 * BODY_TOP_RATIO)
-	var body_y1 := 32
+	var body_y0 := roundi(32.0 * BODY_TOP_RATIO) + dy
+	var body_y1 := 32 + dy
 	_draw_shaded_ellipse(image, body_x0, body_y0, body_x1, body_y1, skin_tones)
 	# 하의(기본 코디)는 몸통 타원의 아래쪽(OUTFIT_START_Y 이하)만 덮어써서
 	# 실루엣은 그대로 두고 색만 바꾼다 — 별도 타원을 새로 그리면 몸통과 다른
-	# 윤곽이 생겨 실루엣이 어긋난다.
-	_draw_shaded_ellipse(image, body_x0, body_y0, body_x1, body_y1, outfit_tones, OUTFIT_START_Y)
+	# 윤곽이 생겨 실루엣이 어긋난다. dy만큼 함께 이동해야 몸이 튕겨도 경계가
+	# 어긋나지 않는다.
+	_draw_shaded_ellipse(image, body_x0, body_y0, body_x1, body_y1, outfit_tones, OUTFIT_START_Y + dy)
 
-	_draw_hair(image)
-	_draw_eyes(image)
+	_draw_feet(image, foot_dx, skin_tones["shadow"])
+	_draw_hair(image, dy)
+	_draw_eyes(image, dy)
 	sprite.texture = ImageTexture.create_from_image(image)
 
 # assets/ART_STYLE.md 3톤 공식(HSV 기준): 그림자 = 명도-20%/채도+5%,
@@ -222,23 +251,44 @@ func _draw_shaded_ellipse(
 			var tone_key := _shade_for_position(dx, dy)
 			image.set_pixel(x, y, tones[tone_key])
 
-func _draw_hair(image: Image) -> void:
+# dy: 걷기 바운스로 머리가 위아래로 튕길 때 머리카락/눈도 함께 움직여야
+# 머리에 붙어있는 것처럼 보인다(따로 움직이면 머리 위에 붕 뜬 것처럼 어긋남).
+func _draw_hair(image: Image, dy: int) -> void:
 	if not HAIR_STYLES.has(hair_type):
 		return
 	var style: Dictionary = HAIR_STYLES[hair_type]
 	var x_range: Array = style["x_range"]
 	var color: Color = style["color"]
 	for x in range(x_range[0], x_range[1]):
-		for y in range(HAIR_ROWS[0], HAIR_ROWS[1]):
-			image.set_pixel(x, y, color)
+		for y in range(HAIR_ROWS[0] + dy, HAIR_ROWS[1] + dy):
+			if y >= 0 and y < 32:
+				image.set_pixel(x, y, color)
 
-func _draw_eyes(image: Image) -> void:
+func _draw_eyes(image: Image, dy: int) -> void:
 	for x in range(EYE_LEFT_X[0], EYE_LEFT_X[1]):
-		for y in range(EYE_ROWS[0], EYE_ROWS[1]):
-			image.set_pixel(x, y, eye_color)
+		for y in range(EYE_ROWS[0] + dy, EYE_ROWS[1] + dy):
+			if y >= 0 and y < 32:
+				image.set_pixel(x, y, eye_color)
 	for x in range(EYE_RIGHT_X[0], EYE_RIGHT_X[1]):
-		for y in range(EYE_ROWS[0], EYE_ROWS[1]):
-			image.set_pixel(x, y, eye_color)
+		for y in range(EYE_ROWS[0] + dy, EYE_ROWS[1] + dy):
+			if y >= 0 and y < 32:
+				image.set_pixel(x, y, eye_color)
+
+# 발(신발) — tools/sprite_gen.py의 _draw_feet()와 동일한 공식. 몸이 실제
+# 다리를 그릴 수 없는 눈사람형이라, 캔버스 하단에 작은 타원 두 개를 프레임마다
+# 좁혔다/넓혔다 하는 것으로 "걷는 발"을 흉내낸다. 발은 바운스(dy)와 무관하게
+# 항상 캔버스 하단에 고정한다 — 발이 땅에 붙어있고 몸만 튕기는 쪽이, 발까지
+# 같이 튕기는 것보다 자연스럽다.
+func _draw_feet(image: Image, foot_dx: int, shoe_color: Color) -> void:
+	var left_cx := 16.0 - FOOT_CENTER_OFFSET - foot_dx
+	var right_cx := 16.0 + FOOT_CENTER_OFFSET + foot_dx
+	for fx_center in [left_cx, right_cx]:
+		var fx0 := roundi(fx_center - FOOT_HALF_WIDTH)
+		var fx1 := roundi(fx_center + FOOT_HALF_WIDTH)
+		for y in range(FOOT_Y[0], FOOT_Y[1]):
+			for x in range(fx0, fx1):
+				if x >= 0 and x < 32:
+					image.set_pixel(x, y, shoe_color)
 
 func set_appearance(new_skin_color: Color, new_eye_color: Color, new_hair_type: String) -> void:
 	skin_color = new_skin_color
@@ -253,7 +303,7 @@ func set_appearance(new_skin_color: Color, new_eye_color: Color, new_hair_type: 
 # 움직이게 한다. 오프라인(멀티플레이 피어 미설정) 상태에서는 authority
 # 기본값(1)과 unique_id 기본값(1)이 항상 같아 기존 싱글플레이 동작에는
 # 영향이 없다.
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
 	var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -262,6 +312,7 @@ func _physics_process(_delta: float) -> void:
 	if direction.length() > 0.0:
 		facing_direction = direction.normalized()
 
+	_update_walk_animation(delta, direction.length() > 0.0)
 	_update_aim_direction()
 
 	# 좌클릭(발사)/우클릭(탄종류 변경)/R(재장전) 모두 여기서 폴링한다 — 기존
@@ -280,6 +331,26 @@ func _physics_process(_delta: float) -> void:
 		switch_ammo_type()
 	if Input.is_action_just_pressed("reload"):
 		reload()
+
+# 이동 중일 때만 WALK_FRAME_DURATION마다 프레임을 넘기고, 멈추면 즉시
+# IDLE_FRAME으로 돌아간다(재생 중이던 프레임에서 뚝 멈추면 다리가 벌어진
+# 채로 정지해 보이는 어색함을 피하기 위함). 프레임이 실제로 바뀔 때만
+# _apply_appearance()를 다시 호출해, 텍스처를 매 물리 프레임 재생성하는
+# 낭비를 피한다.
+func _update_walk_animation(delta: float, moving: bool) -> void:
+	if not moving:
+		if is_walking:
+			is_walking = false
+			walk_timer = 0.0
+			walk_frame_index = 0
+			_apply_appearance()
+		return
+	is_walking = true
+	walk_timer += delta
+	if walk_timer >= WALK_FRAME_DURATION:
+		walk_timer -= WALK_FRAME_DURATION
+		walk_frame_index = (walk_frame_index + 1) % WALK_FRAMES.size()
+		_apply_appearance()
 
 # 사거리/조준 조건을 만족하는 가장 가까운 동물을 찾아 발사 판정을 넘긴다.
 # "무엇을 맞힐 수 있는가"만 여기서 결정하고, 탄약 소모나 공격/포획 게이트 같은
