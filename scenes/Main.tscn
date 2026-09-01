@@ -270,9 +270,9 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -160.0
+offset_left = -230.0
 offset_top = -190.0
-offset_right = 160.0
+offset_right = 230.0
 offset_bottom = 190.0
 theme_override_constants/separation = 14
 
@@ -281,16 +281,107 @@ theme_override_font_sizes/font_size = 26
 text = "인벤토리 (E로 닫기)"
 horizontal_alignment = 1
 
-[node name="SlotGrid" type="GridContainer" parent="UI/InventoryOverlay/InventoryPanel"]
+[node name="Body" type="HBoxContainer" parent="UI/InventoryOverlay/InventoryPanel"]
+size_flags_horizontal = 4
+theme_override_constants/separation = 16
+
+[node name="WearableColumn" type="VBoxContainer" parent="UI/InventoryOverlay/InventoryPanel/Body"]
+theme_override_constants/separation = 6
+
+[node name="WearableHat" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn"]
+custom_minimum_size = Vector2(140, 34)
+
+[node name="WearableLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn/WearableHat"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+theme_override_font_sizes/font_size = 14
+text = "모자: -"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="WearableTop" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn"]
+custom_minimum_size = Vector2(140, 34)
+
+[node name="WearableLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn/WearableTop"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+theme_override_font_sizes/font_size = 14
+text = "상의: -"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="WearableBottom" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn"]
+custom_minimum_size = Vector2(140, 34)
+
+[node name="WearableLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn/WearableBottom"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+theme_override_font_sizes/font_size = 14
+text = "하의: -"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="WearableShoes" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn"]
+custom_minimum_size = Vector2(140, 34)
+
+[node name="WearableLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn/WearableShoes"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+theme_override_font_sizes/font_size = 14
+text = "신발: -"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="WearableEarring" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn"]
+custom_minimum_size = Vector2(140, 34)
+
+[node name="WearableLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn/WearableEarring"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+theme_override_font_sizes/font_size = 14
+text = "귀걸이: -"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="WearableRing" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn"]
+custom_minimum_size = Vector2(140, 34)
+
+[node name="WearableLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn/WearableRing"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+theme_override_font_sizes/font_size = 14
+text = "반지: -"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="WearableBag" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn"]
+custom_minimum_size = Vector2(140, 34)
+
+[node name="WearableLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/WearableColumn/WearableBag"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+theme_override_font_sizes/font_size = 14
+text = "가방: -"
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="SlotGrid" type="GridContainer" parent="UI/InventoryOverlay/InventoryPanel/Body"]
 size_flags_horizontal = 4
 columns = 3
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 
-[node name="Slot0" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid"]
+[node name="Slot0" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid"]
 custom_minimum_size = Vector2(96, 96)
 
-[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid/Slot0"]
+[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid/Slot0"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_font_sizes/font_size = 16
@@ -299,10 +390,10 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Slot1" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid"]
+[node name="Slot1" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid"]
 custom_minimum_size = Vector2(96, 96)
 
-[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid/Slot1"]
+[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid/Slot1"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_font_sizes/font_size = 16
@@ -311,10 +402,10 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Slot2" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid"]
+[node name="Slot2" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid"]
 custom_minimum_size = Vector2(96, 96)
 
-[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid/Slot2"]
+[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid/Slot2"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_font_sizes/font_size = 16
@@ -323,10 +414,10 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Slot3" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid"]
+[node name="Slot3" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid"]
 custom_minimum_size = Vector2(96, 96)
 
-[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid/Slot3"]
+[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid/Slot3"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_font_sizes/font_size = 16
@@ -335,10 +426,10 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Slot4" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid"]
+[node name="Slot4" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid"]
 custom_minimum_size = Vector2(96, 96)
 
-[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid/Slot4"]
+[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid/Slot4"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_font_sizes/font_size = 16
@@ -347,10 +438,10 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Slot5" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid"]
+[node name="Slot5" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid"]
 custom_minimum_size = Vector2(96, 96)
 
-[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid/Slot5"]
+[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid/Slot5"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_font_sizes/font_size = 16
@@ -359,10 +450,10 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Slot6" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid"]
+[node name="Slot6" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid"]
 custom_minimum_size = Vector2(96, 96)
 
-[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid/Slot6"]
+[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid/Slot6"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_font_sizes/font_size = 16
@@ -371,10 +462,10 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Slot7" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid"]
+[node name="Slot7" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid"]
 custom_minimum_size = Vector2(96, 96)
 
-[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid/Slot7"]
+[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid/Slot7"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_font_sizes/font_size = 16
@@ -383,10 +474,10 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Slot8" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid"]
+[node name="Slot8" type="Panel" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid"]
 custom_minimum_size = Vector2(96, 96)
 
-[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/SlotGrid/Slot8"]
+[node name="SlotLabel" type="Label" parent="UI/InventoryOverlay/InventoryPanel/Body/SlotGrid/Slot8"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme_override_font_sizes/font_size = 16

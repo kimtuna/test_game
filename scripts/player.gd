@@ -247,3 +247,26 @@ func equip(slot: String, item_name: String, grade: int = 1) -> void:
 
 func unequip(slot: String) -> void:
 	equipment[slot] = {"name": "", "grade": 0}
+
+# inbox.md #6 4번: 착용형 장비(복장/악세서리) 슬롯. 위 equipment 딕셔너리
+# ("tool"/"weapon"/"rod"/"sickle")는 상호작용에 실제로 쓰이는 "도구" 개념이고,
+# 이 7개는 design.md의 "캐릭터 외형을 커스터마이징할 수 있다"에 해당하는
+# "복장/악세서리" 개념이라 별개 딕셔너리(wearables)로 분리했다. 아직 옷/장신구를
+# 얻는 방법(상점/제작/줍기)이 전혀 없어(범위 밖, inbox #4 5번) 기본값은 전부
+# 빈 슬롯이다 — "기본 코디 제공"은 이미 OUTFIT_COLOR로 그리는 하의 색으로
+# 충족되어 있어(위 주석 참고) 이 슬롯들까지 기본으로 채울 필요는 없다고
+# 판단했다.
+const WEARABLE_SLOTS: Array[String] = ["hat", "top", "bottom", "shoes", "earring", "ring", "bag"]
+
+var wearables: Dictionary = {
+	"hat": "", "top": "", "bottom": "", "shoes": "", "earring": "", "ring": "", "bag": "",
+}
+
+func get_wearable(slot: String) -> String:
+	return wearables.get(slot, "")
+
+func equip_wearable(slot: String, item_name: String) -> void:
+	wearables[slot] = item_name
+
+func unequip_wearable(slot: String) -> void:
+	wearables[slot] = ""

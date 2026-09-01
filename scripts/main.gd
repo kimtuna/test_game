@@ -35,6 +35,22 @@ const RESOURCE_TO_SLOT: Dictionary = {
 # inbox #4 5번) 가장 단순하고 상식적인 기본값으로 판단했다.
 const INVENTORY_CAPACITY: int = 9
 
+# inbox.md #6 4번: 착용형 장비(복장/악세서리) 7슬롯의 UI 표시. player.gd의
+# WEARABLE_SLOTS(영문 키)와 순서가 같아야 WearableColumn의 자식 순서와
+# 대응된다 — 마인크래프트 인벤토리 화면처럼 인벤토리 그리드(E)와 같은 화면
+# 안에 장비 슬롯 칸을 두는 편이, 아직 옷을 얻는 방법이 없는 지금 단계에서
+# 별도 키 바인딩(지시에 명시되지 않음)을 새로 만드는 것보다 자연스럽다고
+# 판단했다.
+const WEARABLE_SLOT_NAMES: Dictionary = {
+	"hat": "모자",
+	"top": "상의",
+	"bottom": "하의",
+	"shoes": "신발",
+	"earring": "귀걸이",
+	"ring": "반지",
+	"bag": "가방",
+}
+
 # inbox.md #4 4번(메인 메뉴 + 슬롯 선택 + 저장/불러오기 시스템)의 저장/불러오기
 # 조각. 지금까지 슬롯별 외형(slot_colors)은 세션(프로세스) 안에서만
 # 기억되어, "기존에 저장된 슬롯 선택 시 저장된 상태 그대로 이어서 시작"이
@@ -57,7 +73,8 @@ var captured_animals: Dictionary = {}
 @onready var tutorial_overlay: Control = $UI/TutorialOverlay
 @onready var pause_overlay: Control = $UI/PauseOverlay
 @onready var inventory_overlay: Control = $UI/InventoryOverlay
-@onready var inventory_slot_grid: GridContainer = $UI/InventoryOverlay/InventoryPanel/SlotGrid
+@onready var inventory_slot_grid: GridContainer = $UI/InventoryOverlay/InventoryPanel/Body/SlotGrid
+@onready var wearable_slot_column: VBoxContainer = $UI/InventoryOverlay/InventoryPanel/Body/WearableColumn
 
 # 색상 선택 키(1~4)와 스와치 색상을 한 곳에 묶어, 씬의 Swatch 노드 색과
 # 어긋나지 않도록 함(#15/#22에서 배운 "값 중복으로 인한 잠재 버그" 반복 방지).
@@ -275,6 +292,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.keycode == KEY_E:
 		_update_inventory_grid()
+		_update_wearable_slots()
 		inventory_overlay.visible = true
 		get_viewport().set_input_as_handled()
 
@@ -304,6 +322,7 @@ func _save_slot(slot: int) -> void:
 	var data := {
 		"color": [slot_colors[slot].r, slot_colors[slot].g, slot_colors[slot].b],
 		"equipment": player.equipment if player != null else {},
+		"wearables": player.wearables if player != null else {},
 		"inventory": inventory,
 		"captured_animals": captured_animals,
 	}
@@ -334,6 +353,9 @@ func _apply_slot_data(data: Dictionary) -> void:
 		for slot_name in equip_data.keys():
 			var item: Dictionary = equip_data[slot_name]
 			player.equip(slot_name, item.get("name", ""), int(item.get("grade", 1)))
+		var wearable_data: Dictionary = data.get("wearables", {})
+		for slot_name in wearable_data.keys():
+			player.equip_wearable(slot_name, String(wearable_data[slot_name]))
 	inventory.clear()
 	for key in data.get("inventory", {}).keys():
 		inventory[key] = int(data["inventory"][key])
@@ -402,6 +424,21 @@ func _update_inventory_grid() -> void:
 			label.text = "%s\n%d" % [resource_name, inventory[resource_name]]
 		else:
 			label.text = "-"
+
+# inbox.md #6 4번: WearableColumn의 7개 Panel을 WEARABLE_SLOT_NAMES 순서(=
+# player.gd의 WEARABLE_SLOTS 순서)대로 훑으며 "이름: 착용중인 아이템(없으면 -)"을
+# 표시한다.
+func _update_wearable_slots() -> void:
+	var player := get_tree().get_first_node_in_group("player")
+	if player == null:
+		return
+	var panels := wearable_slot_column.get_children()
+	var slot_keys: Array = WEARABLE_SLOT_NAMES.keys()
+	for i in range(panels.size()):
+		var label: Label = panels[i].get_node("WearableLabel")
+		var slot_key: String = slot_keys[i]
+		var item_name: String = player.get_wearable(slot_key)
+		label.text = "%s: %s" % [WEARABLE_SLOT_NAMES[slot_key], item_name if item_name != "" else "-"]
 
 func _update_capture_label() -> void:
 	if captured_animals.is_empty():

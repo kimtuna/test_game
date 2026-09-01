@@ -46,7 +46,7 @@ func _initialize() -> void:
 	await process_frame
 
 	var inventory_overlay: Control = main.get_node("UI/InventoryOverlay")
-	var slot_grid: GridContainer = main.get_node("UI/InventoryOverlay/InventoryPanel/SlotGrid")
+	var slot_grid: GridContainer = main.get_node("UI/InventoryOverlay/InventoryPanel/Body/SlotGrid")
 	var ok := true
 
 	if inventory_overlay.visible:
