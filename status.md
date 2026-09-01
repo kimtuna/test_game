@@ -338,3 +338,22 @@
 - 남은 제약: `inbox.md` #13의 문제 2(경계에서 멈춤)와 문제 3(배회 없음)이 아직 미처리다 — 다음 세션이 이어서 처리해야 한다(문제 2/3은 서로 관련이 깊어 `terrain.get_island_bounds()` 경계 처리를 배회/도주가 공유하는 공용 함수로 만드는 걸 문제 2 처리 시 함께 고려할 것, inbox #13 원문 참고). `animal_hunt`/`animal_capture`의 fire 입력 이중 소비 플레이키니스(status.md #54/#66/#73 CAUTION 세 번째 관찰)도 여전히 미해결이며, 이번 세션에서 재확인용 근거를 추가로 남겼다. 그 외 기존 미해결 사항(원격 피어 애니메이션 미동기화, 나무/식물/물고기가 절차적 단색 사각형, 아이템 줍기/제작)도 그대로 남아있다.
 - 다음 할 일: `inbox.md` #13이 아직 완전히 처리되지 않았으므로(문제 1만 완료) 규칙 7의 HARNESS_STOP 조건(미처리 항목 없음)에 해당하지 않는다 — 다음 세션은 `inbox.md` #13의 문제 2(섬 경계에서 도주/배회가 멈추는 문제)부터 이어서 처리할 것.
 
+---
+
+### #74 — 2026-09-02 05:44 (사슴 도주 중 섬 경계 도달 시 얼어붙던 문제 수정, inbox #13 문제 2 처리)
+
+요약: `inbox.md` #13의 세 가지 동물 AI 문제 중 문제 2(섬 경계에 닿으면 멈추는 문제)를 처리했다(규칙 4: 기능 하나만, 문제 3(배회)은 다음 세션으로 남김). `scripts/animal.gd`의 `_physics_process()`가 이동 후 위치만 clamp하고 `flee_direction`은 그대로 바깥쪽을 향해 남겨둬서, 경계에 닿으면 매 프레임 같은 좌표로 다시 clamp되며 사실상 멈추던 게 원인이었다 — 경계를 넘은 축의 방향 성분을 반사(reflect)시키는 순수 함수를 추가해 고쳤다. 실제 창을 띄워 물리 프레임마다 좌표를 찍어보니 경계에 닿은 뒤에도 계속 안쪽으로 이동하는 것을 직접 확인했다.
+
+- 계기: `status.md` #73이 다음 세션은 `inbox.md` #13의 문제 2(섬 경계에서 도주가 멈추는 문제)부터 이어받으라고 명시했다.
+- 한 일:
+  - `scripts/animal.gd`에 `_reflect_direction(position, direction, bounds) -> Vector2` 정적 함수를 추가했다. 이동을 적용한 뒤의 `position`이 `bounds`의 x 또는 y 경계를 넘었으면(≤ 최솟값 또는 ≥ 최댓값) 해당 축의 방향 성분 부호를 뒤집어 반환한다(코너에 닿으면 두 축 모두 반전). 인스턴스 상태를 전혀 참조하지 않는 순수 함수로 만들어, inbox #13 원문이 권장한 대로 문제 3(배회)의 경계 처리에도 그대로 재사용할 수 있게 했다.
+  - `_physics_process()`에서 위치를 clamp하기 직전에 `_reflect_direction()`으로 새 방향을 구하고, 기존 방향과 달라졌으면(즉 이번 프레임에 경계에 닿았으면) `flee_direction`을 갱신하고 `_update_facing()`도 다시 호출해 `flip_h`가 반사된 방향을 따라가도록 했다 — 안 그러면 문제 1(#73)에서 고친 방향 반전이 경계에서 튕길 때만 어긋나 보인다.
+  - `tests/animal_boundary_flee_headless_test.gd`를 새로 만들어 회귀 검증을 추가했다: 동물을 섬 오른쪽 경계 바로 안쪽에 두고 바다 쪽(+x)으로 강제 도주시킨 뒤 60물리프레임 동안 (a) 경계를 넘지 않는지, (b) 마지막 30프레임 동안 위치가 계속 바뀌는지(얼어붙지 않는지), (c) `flee_direction.x`가 음수로 반사됐는지 확인한다.
+  - 시각 확인(CLAUDE.md가 허용한 절차): `godot --path .`(비headless)로 임시 스크립트를 실행해(`tests/_tmp_boundary_visual_probe.gd`, 확인 후 삭제) 동물을 경계에 놓고 15프레임 간격으로 `get_viewport().get_texture().get_image().save_png()`로 좌표와 스크린샷을 함께 기록했다 — `animal.x`가 1575.0 → 1524.7 → 1469.7 → 1414.7 → 1359.7 → 1304.7로 꾸준히 감소(안쪽으로 이동)하는 것을 확인했다. 이전 버그였다면 첫 프레임 이후 x가 경계값(약 1576)에 고정된 채 변하지 않았을 것이다. 확인 후 임시 스크립트/PNG 폴더를 삭제하고 `ps aux`로 godot 프로세스가 남아있지 않음을 확인했다.
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음.
+  - 새로 만든 `animal_boundary_flee_headless_test.gd`: `PASS`. 관련 기존 테스트 `animal_flee_headless_test`(경계 시나리오 포함)/`animal_facing_headless_test`/`animal_sight_flee_headless_test`/`animal_sound_flee_headless_test`: 모두 `PASS`(회귀 없음). status.md #73 CAUTION이 남긴 플레이키니스 재확인 차원에서 `animal_hunt_headless_test`/`animal_capture_headless_test`도 함께 돌려봤는데 이번에는 둘 다 `PASS`했다(간헐적 현상이라는 기존 판단과 일치, 이번 세션 변경과는 무관).
+  - 시각 확인 도중 `godot --path .`(비headless) 실행이 `project.godot`의 `window/stretch/aspect="keep"` 줄을 다시 지우는 것을 목격했다(status.md #72/inbox #12가 이미 기록한 것과 동일한 에디터/실행기 동작) — 이번 세션이 만든 변경과 무관하고 `game_settings.gd`가 이미 런타임 코드로 그 값을 강제하고 있어(status.md #72) 실제 동작에는 영향이 없으므로, `git checkout -- project.godot`로 되돌리고 커밋에는 포함하지 않았다.
+- 남은 제약: `inbox.md` #13의 문제 3(배회 없음)이 아직 미처리다 — 다음 세션이 이어서 처리해야 한다. `_reflect_direction()`을 문제 3의 배회 이동에도 그대로 재사용하도록 만들어뒀으니 그대로 가져다 쓰면 된다. `animal_hunt`/`animal_capture`의 fire 입력 이중 소비 플레이키니스(status.md #54/#66/#73)는 여전히 근본 원인 미해결로 남아있다. `project.godot`가 비headless 실행/에디터에 의해 `[display]` 섹션을 계속 잃는 현상(status.md #72/inbox #12/이번 세션에서 재관찰)도 근본 원인은 여전히 특정되지 않았다 — 다만 런타임 코드가 이미 그 값을 매번 강제하므로 실사용에는 영향 없음. 그 외 기존 미해결 사항(원격 피어 애니메이션 미동기화, 나무/식물/물고기가 절차적 단색 사각형, 아이템 줍기/제작)도 그대로 남아있다.
+- 다음 할 일: `inbox.md` #13이 아직 완전히 처리되지 않았으므로(문제 1·2만 완료) 규칙 7의 HARNESS_STOP 조건(미처리 항목 없음)에 해당하지 않는다 — 다음 세션은 `inbox.md` #13의 문제 3(동물 기본 배회 행동 추가, `_reflect_direction()` 재사용)을 이어서 처리할 것.
+
