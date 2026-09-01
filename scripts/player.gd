@@ -24,14 +24,28 @@ var equipment: Dictionary = {
 }
 
 const SPEED := 300.0
+const DEFAULT_BODY_COLOR := Color(0.2, 0.6, 1.0)
+
+var body_color: Color = DEFAULT_BODY_COLOR
 
 @onready var sprite: Sprite2D = $Sprite2D
 
 func _ready() -> void:
 	add_to_group("player")
+	_apply_body_color(body_color)
+
+# design.md의 "캐릭터 외형을 커스터마이징할 수 있다"의 첫 조각. 아직 별도
+# 아트 리소스가 없어(범위 밖) 지금까지 절차적 단색 텍스처를 써온 패턴을
+# 그대로 유지하되, 색을 외부(커스터마이징 UI)에서 바꿀 수 있도록 만든 것이
+# 이번 조각에서 새로 생긴 부분이다.
+func _apply_body_color(color: Color) -> void:
+	body_color = color
 	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
-	image.fill(Color(0.2, 0.6, 1.0))
+	image.fill(color)
 	sprite.texture = ImageTexture.create_from_image(image)
+
+func set_body_color(color: Color) -> void:
+	_apply_body_color(color)
 
 func _physics_process(_delta: float) -> void:
 	var direction := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")

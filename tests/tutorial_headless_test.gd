@@ -2,7 +2,10 @@ extends SceneTree
 
 # 헤드리스 환경에서 튜토리얼 오버레이의 최소 동작을 검증하는 통합 테스트.
 # 실행: godot --headless --path . --script res://tests/tutorial_headless_test.gd
-# (1) 게임 시작 시 튜토리얼 오버레이가 보이는지, (2) 아무 키나 누르면
+# status.md #30에서 캐릭터 커스터마이징 오버레이가 튜토리얼보다 먼저 뜨도록
+# 순서가 바뀌어, 이 테스트도 먼저 커스터마이징 색 선택(키 1)을 흉내낸 뒤
+# 튜토리얼 오버레이가 보이는지부터 검증하도록 갱신했다.
+# (1) 색을 고르면 튜토리얼 오버레이가 나타나는지, (2) 아무 키나 누르면
 # 사라지는지, (3) 사라진 뒤에는 다시 나타나지 않는지 확인한다.
 
 func _initialize() -> void:
@@ -11,11 +14,22 @@ func _initialize() -> void:
 	await process_frame
 
 	var overlay: Control = main.get_node("UI/TutorialOverlay")
+	var customization_overlay: Control = main.get_node("UI/CustomizationOverlay")
 
 	var ok := true
 
+	var color_event := InputEventKey.new()
+	color_event.keycode = KEY_1
+	color_event.pressed = true
+	Input.parse_input_event(color_event)
+	await process_frame
+
+	if customization_overlay.visible:
+		push_error("FAIL: 색 선택 후에도 커스터마이징 오버레이가 사라지지 않음")
+		ok = false
+
 	if not overlay.visible:
-		push_error("FAIL: 시작 시 튜토리얼 오버레이가 보이지 않음")
+		push_error("FAIL: 커스터마이징 후 튜토리얼 오버레이가 보이지 않음")
 		ok = false
 
 	var key_event := InputEventKey.new()
