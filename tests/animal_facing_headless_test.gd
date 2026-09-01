@@ -4,6 +4,8 @@ extends SceneTree
 # inbox.md #13 문제 1(방향 반전 로직 부재) 회귀 방지용.
 # 실행: godot --headless --path . --script res://tests/animal_facing_headless_test.gd
 
+const TestInputHelper := preload("res://tests/test_input_helper.gd")
+
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
 	root.add_child(main)
@@ -19,10 +21,7 @@ func _initialize() -> void:
 	player.global_position = animal.global_position + Vector2(-40, 0)
 	for i in range(5):
 		await physics_frame
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if not animal.is_fleeing:
 		push_error("FAIL: 공격 후 도주 상태가 되지 않음")

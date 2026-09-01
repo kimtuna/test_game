@@ -14,6 +14,8 @@ extends SceneTree
 # 2) 사거리 안(200px) + 반대 방향 조준 -> 빗나감(체력 불변)
 # 3) 사거리 밖(400px) + 올바른 조준 방향 -> 빗나감(체력 불변)
 
+const TestInputHelper := preload("res://tests/test_input_helper.gd")
+
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
 	root.add_child(main)
@@ -30,10 +32,7 @@ func _initialize() -> void:
 	player.facing_direction = Vector2.RIGHT
 	for i in range(5):
 		await physics_frame
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 	if health_label.text != "100/100":
 		push_error("FAIL: 사거리(350) 밖인데도 명중해 체력이 감소함 (실제: %s)" % health_label.text)
 		ok = false
@@ -43,10 +42,7 @@ func _initialize() -> void:
 	player.facing_direction = Vector2.LEFT
 	for i in range(5):
 		await physics_frame
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 	if health_label.text != "100/100":
 		push_error("FAIL: 조준 방향이 반대인데도 명중해 체력이 감소함 (실제: %s)" % health_label.text)
 		ok = false
@@ -56,10 +52,7 @@ func _initialize() -> void:
 	player.facing_direction = Vector2.RIGHT
 	for i in range(5):
 		await physics_frame
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 	if health_label.text != "69/100":
 		push_error("FAIL: 사거리 안 + 올바른 조준인데도 명중하지 않음 (실제: %s)" % health_label.text)
 		ok = false

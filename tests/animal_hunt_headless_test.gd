@@ -8,6 +8,11 @@ extends SceneTree
 # 공격당한 동물은 살아있는 동안 플레이어 반대 방향으로 잠시 도망가므로(피격 도주),
 # 매 공격 사이에 도망이 끝날 때까지 기다린 뒤 Player를 동물 위치로 다시 이동시켜
 # "추격해서 다시 근접한다"는 상황을 흉내낸다.
+# 클릭(fire) 시뮬레이션은 test_input_helper.gd의 simulate_click()을 쓴다 — inbox.md #14가
+# 지적한 process_frame/physics_frame 혼용으로 인한 입력 이중 소비 플레이키니스를 근본
+# 수정한 것(자세한 원인은 그 파일 주석 참고).
+
+const TestInputHelper := preload("res://tests/test_input_helper.gd")
 
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
@@ -26,10 +31,7 @@ func _initialize() -> void:
 	# 범위 밖에서는 fire를 눌러도 체력이 줄지 않아야 한다.
 	player.global_position = animal.global_position + Vector2(500, 500)
 	await physics_frame
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 	if animal.health != animal.MAX_HEALTH:
 		push_error("FAIL: 범위 밖인데도 동물 체력이 줄어듦 (health=%d)" % animal.health)
 		ok = false
@@ -47,10 +49,7 @@ func _initialize() -> void:
 	var health_label: Label = animal.get_node("HealthLabel")
 	var hits := 0
 	while is_instance_valid(animal) and animal.is_inside_tree() and hits < 10:
-		Input.action_press("fire")
-		await process_frame
-		Input.action_release("fire")
-		await process_frame
+		await TestInputHelper.simulate_click(self, "fire")
 		hits += 1
 		if hits == 1 and health_label.text != "69/100":
 			push_error("FAIL: 1회 공격 후 체력 라벨이 기대한 값(69/100)이 아님 (실제: %s)" % health_label.text)

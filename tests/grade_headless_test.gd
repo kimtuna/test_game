@@ -9,6 +9,8 @@ extends SceneTree
 #     새로 추가된 장비 등급 게이트) 확인한다.
 # 기존 grade=1 개체(Tree, Animal)는 건드리지 않아 기존 테스트와 겹치지 않는다.
 
+const TestInputHelper := preload("res://tests/test_input_helper.gd")
+
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
 	root.add_child(main)
@@ -30,10 +32,7 @@ func _initialize() -> void:
 		await physics_frame
 
 	# 기본 장비(도끼 등급 1)로는 등급 2 나무를 채집할 수 없어야 한다.
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if tree2.hits_taken != 0:
 		push_error("FAIL: 등급 1 도끼로 등급 2 나무를 채집 시도했는데 hits_taken이 증가함")
@@ -42,19 +41,13 @@ func _initialize() -> void:
 	# 등급 2 도끼로 교체하면 상호작용이 진행되어야 한다.
 	player.equip("tool", "도끼", 2)
 
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if not is_instance_valid(tree2) or not tree2.is_inside_tree():
 		push_error("FAIL: 등급 2 나무가 1회 채집으로 사라짐 (grade가 난이도에 반영되지 않음)")
 		ok = false
 
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if is_instance_valid(tree2) and tree2.is_inside_tree():
 		push_error("FAIL: 등급 2 나무가 2회 채집(grade만큼) 후에도 사라지지 않음")
@@ -78,10 +71,7 @@ func _initialize() -> void:
 
 	# 등급 1 도끼로는 등급 2 동물을 공격할 수 없어야 한다.
 	player.equip("tool", "도끼", 1)
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if health_label.text != "200/200":
 		push_error("FAIL: 등급 1 도끼로 등급 2 동물을 공격했는데 체력이 감소함 (실제: %s)" % health_label.text)
@@ -92,10 +82,7 @@ func _initialize() -> void:
 
 	# ATTACK_DAMAGE(31) 기준 6회 공격해야 8%(16) 미만인 14/200에 도달한다.
 	for i in range(6):
-		Input.action_press("fire")
-		await process_frame
-		Input.action_release("fire")
-		await process_frame
+		await TestInputHelper.simulate_click(self, "fire")
 
 		var wait_frames := 0
 		while animal2.is_fleeing and wait_frames < 120:
@@ -115,10 +102,7 @@ func _initialize() -> void:
 	# 등급 1 마취총으로는 포획할 수 없어야 한다(체력은 이미 8% 미만).
 	player.ammo_type = "tranquilizer"
 	player.equip("weapon", "마취총", 1)
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if not is_instance_valid(animal2) or not animal2.is_inside_tree():
 		push_error("FAIL: 등급 1 마취총으로도 등급 2 동물이 포획됨")
@@ -126,10 +110,7 @@ func _initialize() -> void:
 
 	# 등급 2 마취총으로 교체하면 포획에 성공해야 한다.
 	player.equip("weapon", "마취총", 2)
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if is_instance_valid(animal2) and animal2.is_inside_tree():
 		push_error("FAIL: 체력이 8%% 미만(14/200)이고 등급 2 마취총을 장착했는데도 포획되지 않음")

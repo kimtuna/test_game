@@ -12,6 +12,11 @@ extends SceneTree
 #    비어 있어야 한다.
 # 공격당한 동물은 피격 도주로 잠시 자리를 이동하므로, 매 공격 사이에 도망이
 # 끝날 때까지 기다린 뒤 Player를 동물 위치로 다시 이동시켜 추격 상황을 흉내낸다.
+# 클릭(fire) 시뮬레이션은 test_input_helper.gd의 simulate_click()을 쓴다 — inbox.md #14가
+# 지적한 process_frame/physics_frame 혼용으로 인한 입력 이중 소비 플레이키니스를 근본
+# 수정한 것(자세한 원인은 그 파일 주석 참고).
+
+const TestInputHelper := preload("res://tests/test_input_helper.gd")
 
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
@@ -32,10 +37,7 @@ func _initialize() -> void:
 
 	# 체력이 아직 100/100(8% 이상)일 때 마취탄으로 포획을 시도하면 실패해야 한다.
 	player.ammo_type = "tranquilizer"
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 	if not is_instance_valid(animal) or not animal.is_inside_tree():
 		push_error("FAIL: 체력이 충분히 높은데도 포획이 성공함")
 		ok = false
@@ -43,10 +45,7 @@ func _initialize() -> void:
 	# 일반탄으로 3회 공격 -> 100 -> 69 -> 38 -> 7 (8% 미만).
 	player.ammo_type = "normal"
 	for i in range(3):
-		Input.action_press("fire")
-		await process_frame
-		Input.action_release("fire")
-		await process_frame
+		await TestInputHelper.simulate_click(self, "fire")
 
 		var wait_frames := 0
 		while animal.is_fleeing and wait_frames < 120:
@@ -62,10 +61,7 @@ func _initialize() -> void:
 
 	# 이제 체력이 8% 미만이므로 마취탄으로 fire를 누르면 포획되어야 한다.
 	player.ammo_type = "tranquilizer"
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if is_instance_valid(animal) and animal.is_inside_tree():
 		push_error("FAIL: 체력이 8%% 미만인데도 포획이 성공하지 않음")

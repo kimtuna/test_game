@@ -10,6 +10,8 @@ extends SceneTree
 # 연결됐는지 확인하기 위해 rod 장비를 해제한 상태에서는 낚시가 되지 않는
 # 케이스도 함께 검증한다.
 
+const TestInputHelper := preload("res://tests/test_input_helper.gd")
+
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
 	root.add_child(main)
@@ -23,10 +25,7 @@ func _initialize() -> void:
 	# 범위 밖일 때는 fire를 눌러도 물고기가 사라지지 않아야 한다.
 	player.global_position = fish.global_position + Vector2(500, 500)
 	await physics_frame
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 	if not is_instance_valid(fish) or fish.is_inside_tree() == false:
 		push_error("FAIL: 범위 밖인데도 물고기가 낚임")
 		ok = false
@@ -41,10 +40,7 @@ func _initialize() -> void:
 		push_error("FAIL: Player가 Fish의 상호작용 범위에 들어갔는데도 player_nearby가 설정되지 않음")
 		ok = false
 
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if not is_instance_valid(fish) or fish.is_inside_tree() == false:
 		push_error("FAIL: 낚싯대 없이도 물고기가 낚임")
@@ -52,10 +48,7 @@ func _initialize() -> void:
 
 	# 낚싯대를 다시 장착하면 낚시가 성립해야 한다.
 	player.equip("rod", "낚싯대", 1)
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if is_instance_valid(fish) and fish.is_inside_tree():
 		push_error("FAIL: 범위 안에서 낚싯대를 장착하고 fire를 눌렀는데도 물고기가 사라지지 않음")

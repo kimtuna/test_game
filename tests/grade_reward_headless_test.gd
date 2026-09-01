@@ -10,6 +10,8 @@ extends SceneTree
 # 대상으로, 등급 1 개체(다른 테스트가 이미 검증)와 달리 보상이 x2로 나오는지
 # 확인한다.
 
+const TestInputHelper := preload("res://tests/test_input_helper.gd")
+
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
 	root.add_child(main)
@@ -26,10 +28,7 @@ func _initialize() -> void:
 	for i in range(5):
 		await physics_frame
 	for i in range(tree2.grade):
-		Input.action_press("fire")
-		await process_frame
-		Input.action_release("fire")
-		await process_frame
+		await TestInputHelper.simulate_click(self, "fire")
 
 	if is_instance_valid(tree2) and tree2.is_inside_tree():
 		push_error("FAIL: 등급만큼 채집했는데도 등급 2 나무가 남아있음")
@@ -45,10 +44,7 @@ func _initialize() -> void:
 	for i in range(5):
 		await physics_frame
 	for i in range(fish2.grade):
-		Input.action_press("fire")
-		await process_frame
-		Input.action_release("fire")
-		await process_frame
+		await TestInputHelper.simulate_click(self, "fire")
 
 	if is_instance_valid(fish2) and fish2.is_inside_tree():
 		push_error("FAIL: 등급만큼 낚았는데도 등급 2 물고기가 남아있음")
@@ -64,10 +60,7 @@ func _initialize() -> void:
 	for i in range(5):
 		await physics_frame
 	for i in range(plant2.grade):
-		Input.action_press("fire")
-		await process_frame
-		Input.action_release("fire")
-		await process_frame
+		await TestInputHelper.simulate_click(self, "fire")
 
 	if is_instance_valid(plant2) and plant2.is_inside_tree():
 		push_error("FAIL: 등급만큼 채집했는데도 등급 2 식물이 남아있음")
@@ -93,10 +86,7 @@ func _initialize() -> void:
 			await physics_frame
 		if not is_instance_valid(animal2) or not animal2.is_inside_tree():
 			break
-		Input.action_press("fire")
-		await process_frame
-		Input.action_release("fire")
-		await process_frame
+		await TestInputHelper.simulate_click(self, "fire")
 		var wait_frames := 0
 		while is_instance_valid(animal2) and animal2.is_fleeing and wait_frames < 120:
 			await physics_frame

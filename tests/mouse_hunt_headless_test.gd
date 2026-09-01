@@ -8,6 +8,8 @@ extends SceneTree
 # "몇 발 남았는가"(current_ammo)에 집중한다.
 # 실행: godot --headless --path . --script res://tests/mouse_hunt_headless_test.gd
 
+const TestInputHelper := preload("res://tests/test_input_helper.gd")
+
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
 	root.add_child(main)
@@ -26,22 +28,12 @@ func _initialize() -> void:
 
 	# 우클릭(switch_ammo)을 누르면 마취탄으로, 한 번 더 누르면 다시 일반탄으로
 	# 돌아와야 한다(현재 탄종류는 2개뿐이라 순환).
-	Input.action_press("switch_ammo")
-	await physics_frame
-	await process_frame
-	Input.action_release("switch_ammo")
-	await physics_frame
-	await process_frame
+	await TestInputHelper.simulate_click(self, "switch_ammo")
 	if player.ammo_type != "tranquilizer":
 		push_error("FAIL: switch_ammo 1회 후 탄종류가 마취탄으로 바뀌지 않음 (실제: %s)" % player.ammo_type)
 		ok = false
 
-	Input.action_press("switch_ammo")
-	await physics_frame
-	await process_frame
-	Input.action_release("switch_ammo")
-	await physics_frame
-	await process_frame
+	await TestInputHelper.simulate_click(self, "switch_ammo")
 	if player.ammo_type != "normal":
 		push_error("FAIL: switch_ammo 2회 후 탄종류가 일반탄으로 돌아오지 않음 (실제: %s)" % player.ammo_type)
 		ok = false
@@ -56,10 +48,7 @@ func _initialize() -> void:
 
 	# 탄창(6발)을 모두 소모할 때까지 발사한다.
 	for i in range(6):
-		Input.action_press("fire")
-		await process_frame
-		Input.action_release("fire")
-		await process_frame
+		await TestInputHelper.simulate_click(self, "fire")
 
 		var wait_frames := 0
 		while animal2.is_fleeing and wait_frames < 120:
@@ -77,10 +66,7 @@ func _initialize() -> void:
 		ok = false
 
 	# 탄창이 빈 상태에서 fire를 눌러도 아무 효과가 없어야 한다(체력 불변, 탄약 여전히 0).
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 	if health_label.text != "14/200":
 		push_error("FAIL: 탄창이 비었는데도 발사가 진행되어 체력이 변함 (실제: %s)" % health_label.text)
 		ok = false
@@ -89,12 +75,7 @@ func _initialize() -> void:
 		ok = false
 
 	# R(reload)을 누르면 탄창이 가득 찬다.
-	Input.action_press("reload")
-	await physics_frame
-	await process_frame
-	Input.action_release("reload")
-	await physics_frame
-	await process_frame
+	await TestInputHelper.simulate_click(self, "reload")
 	if player.current_ammo != 6:
 		push_error("FAIL: 재장전 후 탄약이 6/6이 아님 (실제: %d)" % player.current_ammo)
 		ok = false

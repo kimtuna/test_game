@@ -7,6 +7,8 @@ extends SceneTree
 # 그룹에서 제거되는지) 확인한다. inbox.md #7 2번으로 채집 트리거가
 # ui_accept에서 fire로 바뀌었다.
 
+const TestInputHelper := preload("res://tests/test_input_helper.gd")
+
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
 	root.add_child(main)
@@ -20,10 +22,7 @@ func _initialize() -> void:
 	# 아직 범위 밖일 때는 fire를 눌러도 나무가 사라지지 않아야 한다.
 	player.global_position = tree.global_position + Vector2(500, 500)
 	await physics_frame
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 	if not is_instance_valid(tree) or tree.is_inside_tree() == false:
 		push_error("FAIL: 범위 밖인데도 나무가 채집됨")
 		ok = false
@@ -37,10 +36,7 @@ func _initialize() -> void:
 		push_error("FAIL: Player가 Tree의 상호작용 범위에 들어갔는데도 player_nearby가 설정되지 않음")
 		ok = false
 
-	Input.action_press("fire")
-	await process_frame
-	Input.action_release("fire")
-	await process_frame
+	await TestInputHelper.simulate_click(self, "fire")
 
 	if is_instance_valid(tree) and tree.is_inside_tree():
 		push_error("FAIL: 범위 안에서 fire를 눌렀는데도 나무가 사라지지 않음")
