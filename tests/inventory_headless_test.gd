@@ -36,12 +36,14 @@ func _initialize() -> void:
 	current_scene = main
 	await process_frame
 
-	# 슬롯 선택 -> 커스터마이징 -> 튜토리얼 닫기를 흉내내 "실제 플레이 상태"까지
-	# 진행한다(pause_menu_headless_test.gd와 동일한 절차).
+	# 슬롯 선택 -> 커스터마이징 3단계(피부색/눈색/머리종류, inbox.md #7 3번) ->
+	# 튜토리얼 닫기를 흉내내 "실제 플레이 상태"까지 진행한다
+	# (pause_menu_headless_test.gd와 동일한 절차).
 	_press_key(KEY_1)
 	await process_frame
-	_press_key(KEY_1)
-	await process_frame
+	for i in range(3):
+		_press_key(KEY_1)
+		await process_frame
 	_press_key(KEY_SPACE)
 	await process_frame
 

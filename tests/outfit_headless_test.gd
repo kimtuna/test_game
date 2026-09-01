@@ -18,7 +18,7 @@ func _initialize() -> void:
 	var top_pixel: Color = image.get_pixel(0, 0)
 	var bottom_pixel: Color = image.get_pixel(0, 31)
 
-	var expected_top: Color = player.DEFAULT_BODY_COLOR
+	var expected_top: Color = player.DEFAULT_SKIN_COLOR
 	var expected_bottom: Color = player.OUTFIT_COLOR
 
 	var top_close := (
@@ -43,8 +43,8 @@ func _initialize() -> void:
 		push_error("FAIL: 상의와 하의 색이 서로 구분되지 않음")
 		ok = false
 
-	# 커스터마이징으로 몸 색을 바꿔도(빨강) 하의(기본 코디)는 바뀌지 않아야 한다.
-	player.set_body_color(Color(0.9, 0.2, 0.2))
+	# 커스터마이징으로 피부색을 바꿔도(빨강) 하의(기본 코디)는 바뀌지 않아야 한다.
+	player.set_appearance(Color(0.9, 0.2, 0.2), player.eye_color, player.hair_type)
 	var image2: Image = player.sprite.texture.get_image()
 	var bottom_pixel2: Color = image2.get_pixel(0, 31)
 	var bottom_close2 := (

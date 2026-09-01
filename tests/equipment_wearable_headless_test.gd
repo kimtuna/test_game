@@ -36,8 +36,12 @@ func _initialize() -> void:
 	root.add_child(main1)
 	await process_frame
 
+	# 슬롯 선택 -> 커스터마이징 3단계(피부색/눈색/머리종류, inbox.md #7 3번) ->
+	# 튜토리얼 닫기.
 	await _press_key(KEY_1)
 	await _press_key(KEY_2)
+	await _press_key(KEY_1)
+	await _press_key(KEY_1)
 	await _press_key(KEY_SPACE)
 
 	var player1: CharacterBody2D = main1.get_node("Player")

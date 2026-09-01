@@ -4,9 +4,9 @@ extends SceneTree
 # 실행: godot --headless --path . --script res://tests/tutorial_headless_test.gd
 # status.md #31에서 캐릭터 슬롯 선택 오버레이가 커스터마이징보다 먼저 뜨도록
 # 앞단이 하나 더 추가되어, 이 테스트도 먼저 슬롯 선택(키 1) -> 커스터마이징
-# 색 선택(키 1)을 흉내낸 뒤 튜토리얼 오버레이가 보이는지부터 검증하도록
-# 갱신했다.
-# (1) 색을 고르면 튜토리얼 오버레이가 나타나는지, (2) 아무 키나 누르면
+# 3단계(피부색/눈색/머리종류, inbox.md #7 3번)를 흉내낸 뒤 튜토리얼 오버레이가
+# 보이는지부터 검증하도록 갱신했다.
+# (1) 3단계를 모두 고르면 튜토리얼 오버레이가 나타나는지, (2) 아무 키나 누르면
 # 사라지는지, (3) 사라진 뒤에는 다시 나타나지 않는지 확인한다.
 
 # 이번 세션에서 main.gd에 슬롯 저장/불러오기(user://saves/*)가 추가되어,
@@ -43,14 +43,16 @@ func _initialize() -> void:
 		push_error("FAIL: 슬롯 선택 후에도 슬롯 오버레이가 사라지지 않음")
 		ok = false
 
-	var color_event := InputEventKey.new()
-	color_event.keycode = KEY_1
-	color_event.pressed = true
-	Input.parse_input_event(color_event)
-	await process_frame
+	# 피부색/눈색/머리종류 3단계를 모두 고른다(inbox.md #7 3번).
+	for i in range(3):
+		var step_event := InputEventKey.new()
+		step_event.keycode = KEY_1
+		step_event.pressed = true
+		Input.parse_input_event(step_event)
+		await process_frame
 
 	if customization_overlay.visible:
-		push_error("FAIL: 색 선택 후에도 커스터마이징 오버레이가 사라지지 않음")
+		push_error("FAIL: 3단계를 모두 고른 후에도 커스터마이징 오버레이가 사라지지 않음")
 		ok = false
 
 	if not overlay.visible:

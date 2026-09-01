@@ -76,14 +76,34 @@ var captured_animals: Dictionary = {}
 @onready var inventory_slot_grid: GridContainer = $UI/InventoryOverlay/InventoryPanel/Body/SlotGrid
 @onready var wearable_slot_column: VBoxContainer = $UI/InventoryOverlay/InventoryPanel/Body/WearableColumn
 @onready var hotbar_row: HBoxContainer = $UI/Hotbar
+@onready var customization_label: Label = $UI/CustomizationOverlay/CustomizationLabel
+@onready var customization_swatches: Array = [
+	$UI/CustomizationOverlay/Swatch1,
+	$UI/CustomizationOverlay/Swatch2,
+	$UI/CustomizationOverlay/Swatch3,
+	$UI/CustomizationOverlay/Swatch4,
+]
 
-# 색상 선택 키(1~4)와 스와치 색상을 한 곳에 묶어, 씬의 Swatch 노드 색과
-# 어긋나지 않도록 함(#15/#22에서 배운 "값 중복으로 인한 잠재 버그" 반복 방지).
-const BODY_COLOR_CHOICES: Dictionary = {
-	KEY_1: Color(0.2, 0.6, 1.0),
-	KEY_2: Color(0.9, 0.2, 0.2),
-	KEY_3: Color(0.25, 0.75, 0.3),
-	KEY_4: Color(0.6, 0.3, 0.8),
+# inbox.md #7 3번: 커스터마이징을 피부색/눈색/머리종류 3단계로 나눈다. 각
+# 선택지는 1~4(또는 3)번 키에 순서대로 대응하는 배열로 두고, CUSTOMIZATION_KEYS의
+# 같은 인덱스로 찾는다 — 예전에 키(Dictionary)와 스와치 노드 색을 따로
+# 하드코딩했다가 어긋날 뻔한 적이 있어서(#15/#22), 이번에는 스와치 색도 이
+# 배열에서 직접 읽어와 칠하므로 값이 한 곳에만 존재한다.
+const CUSTOMIZATION_KEYS: Array = [KEY_1, KEY_2, KEY_3, KEY_4]
+const SKIN_COLORS: Array[Color] = [
+	Color(0.2, 0.6, 1.0), Color(0.9, 0.2, 0.2), Color(0.25, 0.75, 0.3), Color(0.6, 0.3, 0.8),
+]
+const EYE_COLORS: Array[Color] = [
+	Color(0.05, 0.05, 0.05), Color(0.15, 0.35, 0.75), Color(0.25, 0.55, 0.2), Color(0.4, 0.25, 0.1),
+]
+# player.gd의 HAIR_STYLES(종류 -> 색) 순서와 반드시 일치해야 한다 — 여기서는
+# 스와치 미리보기 색으로만 쓰고, 실제 그리기는 player.gd가 담당한다.
+const HAIR_TYPES: Array[String] = ["short", "mohawk", "bald"]
+const HAIR_PREVIEW_COLORS: Array[Color] = [Color(0.25, 0.15, 0.05), Color(0.05, 0.05, 0.05)]
+const CUSTOMIZATION_STEP_LABELS: Dictionary = {
+	0: "피부색을 선택하세요\n\n1: 파랑   2: 빨강   3: 초록   4: 보라",
+	1: "눈 색을 선택하세요\n\n1: 검정   2: 파랑   3: 초록   4: 갈색",
+	2: "머리 종류를 선택하세요\n\n1: 짧은 머리   2: 모히칸   3: 대머리",
 }
 
 # 슬롯 선택 키(1~3)와 슬롯 번호 매핑. design.md의 "계정당 3개 캐릭터 슬롯".
@@ -95,7 +115,7 @@ const SLOT_KEYS: Dictionary = {
 	KEY_3: 3,
 }
 
-# inbox.md #6 5번: 휴대 장비 핫바 선택 키. SLOT_KEYS/BODY_COLOR_CHOICES와 같은
+# inbox.md #6 5번: 휴대 장비 핫바 선택 키. SLOT_KEYS/CUSTOMIZATION_KEYS와 같은
 # 숫자 키(1~5)를 쓰지만, 이 매핑은 slot_overlay/customization_overlay가 모두
 # 닫혀 있는 "실제 플레이 상태"에서만 확인한다(_unhandled_input에서 두 오버레이
 # 분기가 먼저 return하므로 겹치지 않는다).
@@ -107,9 +127,9 @@ const HOTBAR_KEYS: Dictionary = {
 	KEY_5: 4,
 }
 
-# slot_colors: 슬롯 번호 -> 그 슬롯에서 마지막으로 고른 색. 아직 한 번도
-# 커스터마이징하지 않은 슬롯은 키 자체가 없어, 처음 선택 시 커스터마이징
-# 오버레이로 자연스럽게 이어진다.
+# slot_appearance(아래 var 선언부 주석 참고): 슬롯 번호 -> 그 슬롯에서 마지막으로
+# 고른 외형. 아직 한 번도 커스터마이징하지 않은 슬롯은 키 자체가 없어, 처음
+# 선택 시 커스터마이징 오버레이로 자연스럽게 이어진다.
 # design.md의 "멀티플레이(세션 서버 방식)" 로드맵의 다음 조각. status.md #32가
 # 만든 NetworkManager는 접속 자체(핸드셰이크)만 검증했고 실제 게임 오브젝트는
 # 아직 하나도 연결되어 있지 않았다. 이번 조각은 "위치 동기화 없이, 접속하면
@@ -129,8 +149,14 @@ const PLAYER_SPAWN_POSITION := Vector2(576, 324)
 
 @onready var player_spawner: MultiplayerSpawner = $PlayerSpawner
 
-var slot_colors: Dictionary = {}
+# slot_appearance: 슬롯 번호 -> {"skin": Color, "eye": Color, "hair": String}.
+# 예전에는 색 하나(slot_colors)만 저장했지만(inbox.md #7 3번 이전), 이제
+# 커스터마이징 항목이 셋으로 늘어 한 슬롯당 하나의 Dictionary로 묶는다.
+var slot_appearance: Dictionary = {}
 var current_slot: int = 0
+# customization_step: 0=피부색, 1=눈색, 2=머리종류. 셋을 다 고르면 0으로
+# 되돌리고 오버레이를 닫는다(_unhandled_input의 customization_overlay 분기 참고).
+var customization_step: int = 0
 # pending_tutorial: 튜토리얼을 아직 한 번도 보여준 적이 없는가. _ready()에서
 # TUTORIAL_SEEN_FLAG_PATH 존재 여부로 실제 값을 정하므로(계정 전체 기준,
 # 프로세스를 새로 켜도 유지) 여기 기본값(true)은 파일이 없는 최초 실행에서만
@@ -228,7 +254,7 @@ func _on_peer_disconnected(id: int) -> void:
 
 # design.md의 "캐릭터 슬롯"과 "캐릭터 외형을 커스터마이징할 수 있다"를 잇는
 # 흐름. 시작 시 슬롯(1~3)을 고르면 (1) 이번 세션에서 이미 고른 적 있는
-# 슬롯이면 메모리에 있는 slot_colors를 즉시 적용하고, (2) 세션 중엔 처음
+# 슬롯이면 메모리에 있는 slot_appearance를 즉시 적용하고, (2) 세션 중엔 처음
 # 골랐지만 디스크에 저장 파일이 있는 슬롯이면 그 파일을 불러와 적용하고
 # (_apply_slot_data), (3) 저장 파일도 없는 진짜 새 슬롯이면 커스터마이징
 # 오버레이로 이어진다. 슬롯 선택은 게임 시작(메인 메뉴) 시점에만 하며, 게임
@@ -251,30 +277,52 @@ func _unhandled_input(event: InputEvent) -> void:
 		if SLOT_KEYS.has(event.keycode):
 			current_slot = SLOT_KEYS[event.keycode]
 			slot_overlay.visible = false
-			if slot_colors.has(current_slot):
+			if slot_appearance.has(current_slot):
 				var player := get_tree().get_first_node_in_group("player")
 				if player != null:
-					player.set_body_color(slot_colors[current_slot])
+					var appearance: Dictionary = slot_appearance[current_slot]
+					player.set_appearance(appearance["skin"], appearance["eye"], appearance["hair"])
 				_maybe_show_tutorial()
 			elif _has_save(current_slot):
 				_apply_slot_data(_load_slot(current_slot))
 				_maybe_show_tutorial()
 			else:
+				customization_step = 0
+				_update_customization_overlay()
 				customization_overlay.visible = true
 			get_viewport().set_input_as_handled()
 		return
 
 	if customization_overlay.visible:
-		if BODY_COLOR_CHOICES.has(event.keycode):
-			var color: Color = BODY_COLOR_CHOICES[event.keycode]
-			var player := get_tree().get_first_node_in_group("player")
-			if player != null:
-				player.set_body_color(color)
-			slot_colors[current_slot] = color
-			customization_overlay.visible = false
-			_save_slot(current_slot)
-			_maybe_show_tutorial()
-			get_viewport().set_input_as_handled()
+		var player := get_tree().get_first_node_in_group("player")
+		if player == null:
+			return
+		var index: int = CUSTOMIZATION_KEYS.find(event.keycode)
+		match customization_step:
+			0:
+				if index >= 0 and index < SKIN_COLORS.size():
+					player.set_appearance(SKIN_COLORS[index], player.eye_color, player.hair_type)
+					customization_step = 1
+					_update_customization_overlay()
+					get_viewport().set_input_as_handled()
+			1:
+				if index >= 0 and index < EYE_COLORS.size():
+					player.set_appearance(player.skin_color, EYE_COLORS[index], player.hair_type)
+					customization_step = 2
+					_update_customization_overlay()
+					get_viewport().set_input_as_handled()
+			2:
+				if index >= 0 and index < HAIR_TYPES.size():
+					var hair: String = HAIR_TYPES[index]
+					player.set_appearance(player.skin_color, player.eye_color, hair)
+					slot_appearance[current_slot] = {
+						"skin": player.skin_color, "eye": player.eye_color, "hair": hair,
+					}
+					customization_step = 0
+					customization_overlay.visible = false
+					_save_slot(current_slot)
+					_maybe_show_tutorial()
+					get_viewport().set_input_as_handled()
 		return
 
 	if tutorial_overlay.visible:
@@ -320,6 +368,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		inventory_overlay.visible = true
 		get_viewport().set_input_as_handled()
 
+# inbox.md #7 3번: 현재 customization_step에 맞는 안내 문구와 스와치 4개의
+# 색/표시 여부를 갱신한다. 머리 단계는 선택지가 2개(대머리는 색이 없음)뿐이라
+# 나머지 스와치는 숨긴다.
+func _update_customization_overlay() -> void:
+	customization_label.text = CUSTOMIZATION_STEP_LABELS.get(customization_step, "")
+	var swatch_colors: Array
+	match customization_step:
+		0:
+			swatch_colors = SKIN_COLORS
+		1:
+			swatch_colors = EYE_COLORS
+		_:
+			swatch_colors = HAIR_PREVIEW_COLORS
+	for i in range(customization_swatches.size()):
+		if i < swatch_colors.size():
+			customization_swatches[i].visible = true
+			customization_swatches[i].color = swatch_colors[i]
+		else:
+			customization_swatches[i].visible = false
+
 func _maybe_show_tutorial() -> void:
 	if pending_tutorial:
 		tutorial_overlay.visible = true
@@ -339,12 +407,17 @@ func _has_save(slot: int) -> bool:
 	return FileAccess.file_exists(_slot_save_path(slot))
 
 func _save_slot(slot: int) -> void:
-	if slot <= 0 or not slot_colors.has(slot):
+	if slot <= 0 or not slot_appearance.has(slot):
 		return
 	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
 	var player := get_tree().get_first_node_in_group("player")
+	var appearance: Dictionary = slot_appearance[slot]
+	var skin: Color = appearance["skin"]
+	var eye: Color = appearance["eye"]
 	var data := {
-		"color": [slot_colors[slot].r, slot_colors[slot].g, slot_colors[slot].b],
+		"skin": [skin.r, skin.g, skin.b],
+		"eye": [eye.r, eye.g, eye.b],
+		"hair": appearance["hair"],
 		"equipment": player.equipment if player != null else {},
 		"wearables": player.wearables if player != null else {},
 		"hotbar": player.hotbar if player != null else [],
@@ -368,13 +441,19 @@ func _load_slot(slot: int) -> Dictionary:
 # 인벤토리/포획 목록을 그대로 복원한다. "새 슬롯"과 달리 커스터마이징
 # 오버레이를 거치지 않고 곧바로 이어서 시작한다.
 func _apply_slot_data(data: Dictionary) -> void:
-	var c: Array = data.get("color", [])
-	if c.size() == 3:
-		slot_colors[current_slot] = Color(c[0], c[1], c[2])
+	var skin_arr: Array = data.get("skin", [])
+	var eye_arr: Array = data.get("eye", [])
+	if skin_arr.size() == 3 and eye_arr.size() == 3:
+		slot_appearance[current_slot] = {
+			"skin": Color(skin_arr[0], skin_arr[1], skin_arr[2]),
+			"eye": Color(eye_arr[0], eye_arr[1], eye_arr[2]),
+			"hair": String(data.get("hair", "short")),
+		}
 	var player := get_tree().get_first_node_in_group("player")
 	if player != null:
-		if slot_colors.has(current_slot):
-			player.set_body_color(slot_colors[current_slot])
+		if slot_appearance.has(current_slot):
+			var appearance: Dictionary = slot_appearance[current_slot]
+			player.set_appearance(appearance["skin"], appearance["eye"], appearance["hair"])
 		var equip_data: Dictionary = data.get("equipment", {})
 		for slot_name in equip_data.keys():
 			var item: Dictionary = equip_data[slot_name]

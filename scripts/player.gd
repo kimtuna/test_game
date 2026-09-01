@@ -37,7 +37,9 @@ var ammo_type: String = "normal"
 var current_ammo: int = MAGAZINE_SIZE
 
 const SPEED := 300.0
-const DEFAULT_BODY_COLOR := Color(0.2, 0.6, 1.0)
+const DEFAULT_SKIN_COLOR := Color(0.2, 0.6, 1.0)
+const DEFAULT_EYE_COLOR := Color(0.05, 0.05, 0.05)
+const DEFAULT_HAIR_TYPE := "short"
 
 # inbox.md #5: "총인데 직접 다가가서 때려야 한다"는 지적에 따라, 발사 판정을
 # animal.gd의 근접 Area2D(player_nearby, 반경 50)에서 실제 사거리 기반으로
@@ -80,7 +82,23 @@ var aim_direction: Vector2 = Vector2.DOWN
 # 부위 커스터마이징 UI는 새 시스템이라 규칙 4(기능 하나만)를 넘어선다.
 const OUTFIT_COLOR := Color(0.35, 0.25, 0.15)
 
-var body_color: Color = DEFAULT_BODY_COLOR
+# inbox.md #7 3번: 커스터마이징 범위를 몸 색 하나(body_color)에서 눈/피부색/
+# 머리카락 종류 세 가지로 나눈다. 절차적 도트 스타일을 유지하기 위해 머리는
+# 색상 선택이 아니라 "종류"(모양+고정색 조합) 선택으로 둔다 — HAIR_STYLES가
+# 종류별 색과 그릴 x 범위를 함께 갖는다. "bald"(대머리)는 HAIR_STYLES에 키가
+# 없어 머리를 아예 그리지 않는 것으로 표현한다.
+var skin_color: Color = DEFAULT_SKIN_COLOR
+var eye_color: Color = DEFAULT_EYE_COLOR
+var hair_type: String = DEFAULT_HAIR_TYPE
+
+const HAIR_STYLES: Dictionary = {
+	"short": {"color": Color(0.25, 0.15, 0.05), "x_range": [4, 28]},
+	"mohawk": {"color": Color(0.05, 0.05, 0.05), "x_range": [13, 19]},
+}
+const HAIR_ROWS := [0, 6]
+const EYE_ROWS := [10, 13]
+const EYE_LEFT_X := [8, 11]
+const EYE_RIGHT_X := [21, 24]
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var camera: Camera2D = $Camera2D
@@ -88,7 +106,7 @@ var body_color: Color = DEFAULT_BODY_COLOR
 
 func _ready() -> void:
 	add_to_group("player")
-	_apply_body_color(body_color)
+	_apply_appearance()
 	# status.md #33/#34가 남긴 제약: 카메라는 authority propagation으로
 	# 모든 피어에 복제되지만 enabled 값 자체는 authority와 무관하게 항상
 	# true였다 — 호스트 화면에 접속자의 Player까지 함께 존재하면(스폰
@@ -103,22 +121,45 @@ func _ready() -> void:
 
 # design.md의 "캐릭터 외형을 커스터마이징할 수 있다"의 첫 조각. 아직 별도
 # 아트 리소스가 없어(범위 밖) 지금까지 절차적 단색 텍스처를 써온 패턴을
-# 그대로 유지하되, 색을 외부(커스터마이징 UI)에서 바꿀 수 있도록 만든 것이
-# 이번 조각에서 새로 생긴 부분이다.
-func _apply_body_color(color: Color) -> void:
-	body_color = color
+# 그대로 유지하되, 색/모양을 외부(커스터마이징 UI)에서 바꿀 수 있도록 만든
+# 것이 이번 조각에서 새로 생긴 부분이다. 그리는 순서(피부 전체 채우기 ->
+# 머리 -> 눈 -> 하의)가 레이어 순서를 겸한다 — 뒤에 그리는 것이 앞의 것을
+# 덮어쓴다. 머리(x 4~27 또는 13~18)와 눈(x 8~10, 21~23)은 모두 (0,0)/(0,31)
+# 픽셀을 침범하지 않게 x 범위를 잡아, 기존 outfit_headless_test가 검사하던
+# "상의 대 하의" 코너 픽셀 구분이 그대로 유지된다.
+func _apply_appearance() -> void:
 	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
-	image.fill(color)
-	# 하단(다리 위치)만 고정된 기본 복장 색으로 덮어 그려, 상의(커스터마이징
-	# 색)와 하의(기본 코디)가 시각적으로 구분되게 한다. customization_headless_test/
-	# slot_headless_test는 (0,0) 픽셀(상의 영역)만 검사하므로 영향받지 않는다.
+	image.fill(skin_color)
+	_draw_hair(image)
+	_draw_eyes(image)
 	for x in range(32):
 		for y in range(20, 32):
 			image.set_pixel(x, y, OUTFIT_COLOR)
 	sprite.texture = ImageTexture.create_from_image(image)
 
-func set_body_color(color: Color) -> void:
-	_apply_body_color(color)
+func _draw_hair(image: Image) -> void:
+	if not HAIR_STYLES.has(hair_type):
+		return
+	var style: Dictionary = HAIR_STYLES[hair_type]
+	var x_range: Array = style["x_range"]
+	var color: Color = style["color"]
+	for x in range(x_range[0], x_range[1]):
+		for y in range(HAIR_ROWS[0], HAIR_ROWS[1]):
+			image.set_pixel(x, y, color)
+
+func _draw_eyes(image: Image) -> void:
+	for x in range(EYE_LEFT_X[0], EYE_LEFT_X[1]):
+		for y in range(EYE_ROWS[0], EYE_ROWS[1]):
+			image.set_pixel(x, y, eye_color)
+	for x in range(EYE_RIGHT_X[0], EYE_RIGHT_X[1]):
+		for y in range(EYE_ROWS[0], EYE_ROWS[1]):
+			image.set_pixel(x, y, eye_color)
+
+func set_appearance(new_skin_color: Color, new_eye_color: Color, new_hair_type: String) -> void:
+	skin_color = new_skin_color
+	eye_color = new_eye_color
+	hair_type = new_hair_type
+	_apply_appearance()
 
 # status.md #33까지는 여러 Player 인스턴스가 한 화면(호스트)에 존재하면
 # 로컬 키보드 입력이 전부를 동시에 움직였다 — main.gd가 스폰 시

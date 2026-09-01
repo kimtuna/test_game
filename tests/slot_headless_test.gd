@@ -4,12 +4,13 @@ extends SceneTree
 # 실행: godot --headless --path . --script res://tests/slot_headless_test.gd
 # design.md의 "계정당 3개 캐릭터 슬롯"을 검증한다.
 # (1) 시작 시 슬롯 오버레이만 보이는지, (2) 처음 고르는 슬롯(1)은 커스터마이징
-# 으로 이어지는지, (3) 색을 고르면 튜토리얼로 이어지고 색이 저장되는지,
-# (4) 튜토리얼을 닫은 뒤에도(inbox.md #7 1번 — 게임 중 Tab으로 슬롯 오버레이를
-# 다시 여는 기능은 제거됐다) 저장 파일이 남아, 새 인스턴스(=새 실행)에서
-# 슬롯 1을 다시 고르면 커스터마이징 없이 저장해둔 색이 즉시 적용되는지,
-# (5) 같은 새 실행에서 처음 고르는 슬롯(2)은 커스터마이징으로 이어지되
-# 튜토리얼은 다시 뜨지 않는지 확인한다.
+# 으로 이어지는지, (3) 피부색/눈색/머리종류 3단계를 모두 고르면 튜토리얼로
+# 이어지고 값이 저장되는지(inbox.md #7 3번), (4) 튜토리얼을 닫은 뒤에도
+# (inbox.md #7 1번 — 게임 중 Tab으로 슬롯 오버레이를 다시 여는 기능은
+# 제거됐다) 저장 파일이 남아, 새 인스턴스(=새 실행)에서 슬롯 1을 다시 고르면
+# 커스터마이징 없이 저장해둔 외형이 즉시 적용되는지, (5) 같은 새 실행에서
+# 처음 고르는 슬롯(2)은 커스터마이징으로 이어지되 튜토리얼은 다시 뜨지
+# 않는지 확인한다.
 
 func _press_key(keycode: int) -> void:
 	var event := InputEventKey.new()
@@ -55,13 +56,17 @@ func _initialize() -> void:
 		push_error("FAIL: 슬롯 1을 처음 골랐는데 커스터마이징으로 이어지지 않음")
 		ok = false
 
+	# 3단계(피부색/눈색/머리종류)를 모두 골라야 커스터마이징이 끝난다
+	# (inbox.md #7 3번). 빨강 피부/검정 눈/짧은 머리를 고른다.
 	await _press_key(KEY_2)
+	await _press_key(KEY_1)
+	await _press_key(KEY_1)
 	if customization_overlay1.visible or not tutorial_overlay1.visible:
-		push_error("FAIL: 색 선택 후 튜토리얼로 이어지지 않음")
+		push_error("FAIL: 3단계 커스터마이징 후 튜토리얼로 이어지지 않음")
 		ok = false
 	var red := Color(0.9, 0.2, 0.2)
-	if player1.body_color != red:
-		push_error("FAIL: 슬롯 1의 색이 선택한 빨강으로 저장되지 않음 (실제: %s)" % [player1.body_color])
+	if player1.skin_color != red:
+		push_error("FAIL: 슬롯 1의 피부색이 선택한 빨강으로 저장되지 않음 (실제: %s)" % [player1.skin_color])
 		ok = false
 
 	await _press_key(KEY_SPACE)
@@ -91,16 +96,19 @@ func _initialize() -> void:
 		push_error("FAIL: 슬롯 2를 처음 골랐는데 커스터마이징으로 이어지지 않음")
 		ok = false
 
+	# 초록 피부/검정 눈/짧은 머리를 고른다.
 	await _press_key(KEY_3)
+	await _press_key(KEY_1)
+	await _press_key(KEY_1)
 	if customization_overlay2.visible:
-		push_error("FAIL: 슬롯 2 색 선택 후에도 커스터마이징 오버레이가 남아있음")
+		push_error("FAIL: 슬롯 2의 3단계 커스터마이징 후에도 오버레이가 남아있음")
 		ok = false
 	if tutorial_overlay2.visible:
 		push_error("FAIL: 이미 튜토리얼을 본 뒤인데 슬롯 전환 시 튜토리얼이 다시 뜸")
 		ok = false
 	var green := Color(0.25, 0.75, 0.3)
-	if player2.body_color != green:
-		push_error("FAIL: 슬롯 2의 색이 선택한 초록으로 저장되지 않음 (실제: %s)" % [player2.body_color])
+	if player2.skin_color != green:
+		push_error("FAIL: 슬롯 2의 피부색이 선택한 초록으로 저장되지 않음 (실제: %s)" % [player2.skin_color])
 		ok = false
 
 	main2.queue_free()
@@ -121,8 +129,8 @@ func _initialize() -> void:
 	if slot_overlay3.visible or customization_overlay3.visible:
 		push_error("FAIL: 이미 골랐던 슬롯 1을 다시 골랐는데 오버레이가 남아있음")
 		ok = false
-	if player3.body_color != red:
-		push_error("FAIL: 슬롯 1을 다시 골랐는데 저장해둔 빨강이 적용되지 않음 (실제: %s)" % [player3.body_color])
+	if player3.skin_color != red:
+		push_error("FAIL: 슬롯 1을 다시 골랐는데 저장해둔 빨강이 적용되지 않음 (실제: %s)" % [player3.skin_color])
 		ok = false
 
 	_clean_saves()
