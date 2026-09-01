@@ -12,12 +12,22 @@ extends Area2D
 # 포획으로 전환할 수 있는 여지가 생긴다.
 #
 # design.md의 도주 트리거 세 가지(발소리 감지/시야 감지/피격 감지) 중
-# "피격당했을 때"만 이번 단계에서 구현했다 — 이미 _attack()이 호출되는
-# 시점이 있어 별도의 감지 시스템(시야 레이캐스트, 발소리 반경 등) 없이
-# 가장 작은 단위로 추가할 수 있었다. 공격받아 죽지 않고 살아남으면 플레이어
-# 반대 방향으로 FLEE_DURATION초 동안 FLEE_SPEED 속도로 이동한다. 포획 시도
-# (capture, 마취총)는 피해를 주는 "공격"이 아니라 별도 행동이므로 도주를
-# 유발하지 않는다.
+# "피격당했을 때"에 이어 이번 단계에서 "시야 감지"를 추가했다 — 이미 있는
+# player_nearby(상호작용 반경 50) 패턴을 재사용하되, 그보다 넓은 반경(180)의
+# 별도 Area2D(SightArea)를 두어 "가까이서 상호작용 가능"과 "멀리서 눈에 띔"을
+# 구분했다. 플레이어가 SightArea에 처음 들어오면(진입 이벤트 1회) 도주를
+# 시작한다 — 계속 시야 안에 있다고 매 프레임 재유발하지 않는 이유는, 피격
+# 도주와 동일하게 "자극 하나당 도주 한 번" 패턴을 유지해 동물이 근접 전투
+# 범위 안에서 끊임없이 미세 진동하며 도망다니는 부자연스러운 동작을 피하기
+# 위함이다. 다시 도주하려면 일단 시야에서 벗어났다가 재진입해야 한다.
+#
+# 발소리 감지는 여전히 미구현이다 — "발소리"라는 개념(이동 중 여부, 별도
+# 반경) 자체를 새로 정의해야 해 이번 조각의 범위를 넘어선다.
+#
+# 공격받아 죽지 않고 살아남으면(피격 도주) 또는 시야에 처음 들어오면(시야
+# 도주) 플레이어 반대 방향으로 FLEE_DURATION초 동안 FLEE_SPEED 속도로
+# 이동한다. 포획 시도(capture, 마취총)는 피해를 주는 "공격"이 아니라 별도
+# 행동이므로 도주를 유발하지 않는다.
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -30,6 +40,7 @@ const FLEE_DURATION: float = 0.6
 
 var health: int = MAX_HEALTH
 var player_nearby: CharacterBody2D = null
+var player_in_sight: CharacterBody2D = null
 var is_fleeing: bool = false
 var flee_timer: float = 0.0
 var flee_direction: Vector2 = Vector2.ZERO
@@ -37,12 +48,15 @@ var terrain: Node = null
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var health_label: Label = $HealthLabel
+@onready var sight_area: Area2D = $SightArea
 
 func _ready() -> void:
 	add_to_group("harvestable")
 	add_to_group("capturable")
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
+	sight_area.body_entered.connect(_on_sight_body_entered)
+	sight_area.body_exited.connect(_on_sight_body_exited)
 	sprite.texture = _create_animal_texture()
 	_update_health_label()
 	terrain = get_tree().get_first_node_in_group("terrain")
@@ -54,6 +68,17 @@ func _on_body_entered(body: Node2D) -> void:
 func _on_body_exited(body: Node2D) -> void:
 	if body == player_nearby:
 		player_nearby = null
+
+func _on_sight_body_entered(body: Node2D) -> void:
+	if not body.is_in_group("player"):
+		return
+	player_in_sight = body
+	if not is_fleeing:
+		_start_fleeing(body)
+
+func _on_sight_body_exited(body: Node2D) -> void:
+	if body == player_in_sight:
+		player_in_sight = null
 
 func _process(_delta: float) -> void:
 	if player_nearby == null:
@@ -86,11 +111,12 @@ func _attack() -> void:
 	_update_health_label()
 	_start_fleeing()
 
-func _start_fleeing() -> void:
+func _start_fleeing(threat: Node2D = null) -> void:
 	is_fleeing = true
 	flee_timer = FLEE_DURATION
-	if player_nearby != null:
-		var away := global_position - player_nearby.global_position
+	var reference: Node2D = threat if threat != null else player_nearby
+	if reference != null:
+		var away := global_position - reference.global_position
 		flee_direction = away.normalized() if away.length() > 0.001 else Vector2.RIGHT
 	else:
 		flee_direction = Vector2.RIGHT
