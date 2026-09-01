@@ -86,6 +86,16 @@ extends Area2D
 # 게임에 동물 종류가 사슴 하나뿐이라(scenes/Main.tscn에 Animal 인스턴스 1개)
 # 텍스처 경로를 사슴 전용으로 하드코딩했다 — 종류가 늘어나면 텍스처 셋을
 # 파라미터화해야 한다(다음 세션 과제, 지금은 범위 밖).
+#
+# inbox.md #13 문제 1: 도주 방향에 따라 좌우로 뒤집는 로직이 아예 없어서
+# 정지/도주 텍스처가 이동 방향과 무관하게 항상 같은 모습으로 보이던 문제를
+# 고쳤다. _start_fleeing()이 flee_direction을 정할 때마다 _update_facing()을
+# 호출해 sprite.flip_h를 그 방향의 x 부호로 설정한다 — Godot에서 texture와
+# flip_h는 독립 프로퍼티라, 이후 _update_walk_animation()이 정지/걷기 텍스처를
+# 오가도 flip_h는 그대로 유지되어 "자기 자신과 최소한 일관됨"(지시 원문)이
+# 보장된다. deer_base.png/deer_walk_*.png를 확대해 직접 비교해봤는데 둘 다
+# 정면(카메라 쪽)을 향한 유사한 포즈라 "기본 정면" 기준이 서로 다르다고 볼
+# 근거는 없어서 별도 보정값은 추가하지 않았다.
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -245,6 +255,18 @@ func _start_fleeing(threat: Node2D = null) -> void:
 		flee_direction = away.normalized() if away.length() > 0.001 else Vector2.RIGHT
 	else:
 		flee_direction = Vector2.RIGHT
+	_update_facing(flee_direction)
+
+# inbox.md #13 문제 1: 정지 텍스처(deer_base.png)와 걷기 프레임(deer_walk_*.png)에
+# 동일하게 적용되도록 sprite.flip_h를 여기서만 갱신한다 — 텍스처를 바꾸는
+# _update_walk_animation()은 flip_h를 건드리지 않으므로(Godot에서 texture와
+# flip_h는 독립 프로퍼티), 한 번 설정한 좌우 방향이 정지/애니메이션 전환과
+# 무관하게 그대로 유지된다. x 성분이 거의 0(순수 상하 이동)이면 직전 방향을
+# 그대로 둔다 — 좌우 정보가 없는데 임의로 뒤집으면 오히려 더 부자연스럽다.
+func _update_facing(direction: Vector2) -> void:
+	if absf(direction.x) < 0.01:
+		return
+	sprite.flip_h = direction.x < 0.0
 
 func _try_capture(shooter: CharacterBody2D) -> void:
 	if not shooter.has_equipped("weapon"):
