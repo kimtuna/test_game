@@ -6,6 +6,10 @@ config/name="Test Game"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
+[autoload]
+
+NetworkManager="*res://scripts/network_manager.gd"
+
 [display]
 
 window/size/viewport_width=1152
