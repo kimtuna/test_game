@@ -319,3 +319,23 @@
 > 재확인 결과: `equipment_wearable_headless_test`(PASS)를 포함해 위 확인 항목 전체가 정상 통과했다.
 - 남은 제약: 7개 착용형 슬롯은 데이터 구조와 UI 표시(인벤토리 화면 안)만 갖춰졌다 — 아직 옷/장신구를 얻는 방법(상점/제작/줍기)도, 인벤토리에서 클릭/드래그로 장착하는 상호작용도 없다(범위 밖, inbox #4 5번이 제작/줍기 자체를 미룸). 캐릭터 스프라이트에 착용한 아이템이 시각적으로 반영되지도 않는다(아트 리소스 범위 밖). `inbox.md` #6의 5번(핫바 1~5)은 아직 미착수.
 - 다음 할 일: 다음 세션은 `inbox.md` #6의 5번(휴대 장비 핫바, 숫자 1~5, 인벤토리 9칸과 별도 데이터 구조)부터 이어받을 것을 권장한다. `inbox.md` #6에 아직 5번이 남아있으므로 규칙 7에 따라 `HARNESS_STOP`을 남기지 않는다.
+
+---
+
+### #57 — 2026-09-02 03:29 (자동 세션)
+
+- 계기: `inbox.md` #6(부분 처리 중, 5번만 남음)을 이어받았다 — status.md #56이 다음으로 권장한 5번(휴대 장비 핫바, 숫자 1~5, 인벤토리 9칸과 별도 데이터 구조)을 규칙 4(기능 하나만)에 따라 이번 세션의 조각으로 골랐다. 이 항목이 처리되면 inbox #6의 5개 항목이 모두 반영되어 `inbox.md` 전체에 미처리 항목이 남지 않는다.
+- 한 일:
+  - `scripts/player.gd`: `HOTBAR_SIZE`(5) 상수와 `hotbar: Array[String]`(5칸, 기본 전부 빈 문자열), `active_hotbar_index: int`(기본 0)를 추가했다. `get_hotbar_item(index)`/`set_hotbar_item(index, item_name)`/`select_hotbar_slot(index)` 세 메서드를 뒀다 — wearables(inbox #6 4번, status.md #56)와 동일한 패턴으로, 아직 인벤토리에서 핫바로 아이템을 옮기는 상호작용(드래그 등)이 게임 안에 전혀 없어(범위 밖, 줍기/제작과 함께 inbox #4 5번이 미룬 영역) 슬롯 내용물은 항상 빈 문자열로 시작하고, 이번 조각은 "숫자 1~5로 슬롯을 선택할 수 있다"는 데이터 구조 + UI만 갖춘다.
+  - `scenes/Main.tscn`: `UI` 아래 `Hotbar`(HBoxContainer, 화면 하단 중앙 고정)를 신설했다 — `HotbarSlot0~4`(각 64x64 Panel + "번호\n내용물" 텍스트 Label)로 구성. `InventoryOverlay`(E로 토글)와 달리 항상 보이게 만들었다 — 마인크래프트/코어키퍼 참고 지시(inbox #6 3번에서 이미 확립)와 마찬가지로, 실제 플레이 중에도 어떤 슬롯이 선택돼 있는지 눈으로 계속 확인할 수 있어야 의미가 있는 UI라고 판단했다.
+  - `scripts/main.gd`: `HOTBAR_KEYS`(KEY_1~KEY_5 -> 인덱스 0~4) 상수와 `_update_hotbar_ui()`를 추가했다. `_unhandled_input`에서 slot_overlay/customization_overlay/tutorial_overlay/inventory_overlay/pause_overlay가 모두 닫혀있을 때만(각 오버레이 분기가 이미 그 앞에서 return하므로) 숫자 키 1~5를 핫바 슬롯 선택으로 처리한다 — SLOT_KEYS/BODY_COLOR_CHOICES도 같은 숫자 키(1~4)를 쓰지만 각각 slot_overlay/customization_overlay가 열려있을 때만 반응하는 별도 분기라 실제로 겹치지 않는다. 선택된 슬롯은 `self_modulate`를 노란빛으로 바꿔 강조한다(아이콘 리소스가 없어 텍스트+색으로만 구분, 기존 인벤토리 슬롯과 동일한 제약).
+  - 저장/불러오기(`_save_slot`/`_apply_slot_data`)에 `hotbar`/`active_hotbar_index`를 추가해, 핫바 내용물과 선택 상태도 슬롯별로 영속화되게 했다.
+  - 신규 헤드리스 테스트 `tests/hotbar_headless_test.gd`: (1) 기본 상태에서 5슬롯이 전부 비어있고 `active_hotbar_index`가 0이며 `Hotbar` 자식이 5개인지, (2) 숫자 키(3번)를 누르면 `active_hotbar_index`가 바뀌고 선택된 슬롯의 `self_modulate`가 다른 슬롯과 구분되는지, (3) `player.set_hotbar_item()`으로 담은 아이템과 `main._on_harvested()`로 얻은 인벤토리 자원이 서로 섞이지 않는지(별도 데이터 구조 검증), (4) `equipment_wearable_headless_test.gd`와 동일한 절차(인스턴스를 완전히 없애고 새로 만들어 디스크에서 실제로 복원되는지 확인)로 핫바 내용물과 `active_hotbar_index`가 슬롯 저장/불러오기에 영속화되는지 확인한다.
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음).
+  - 이번 변경과 직접 관련된 테스트만 재실행(규칙 4 QA 지침): `hotbar_headless_test`(`PASS`, 신규), `inventory_headless_test`(`PASS`, 핫바와 인벤토리 데이터가 섞이지 않는지 교차 확인), `equipment_wearable_headless_test`(`PASS`, 같은 인벤토리 오버레이/저장 경로를 공유하는 wearables가 이번 변경으로 깨지지 않았는지 확인), `pause_menu_headless_test`(`PASS`, 같은 `_unhandled_input` 오버레이 우선순위 체인에 새 분기를 끼워넣은 변경이라 ESC 흐름이 깨지지 않았는지 확인), `save_load_headless_test`(`PASS`), `slot_headless_test`(`PASS`), `tutorial_headless_test`(`PASS`, 문구 변경 확인) 모두 통과. `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다.
+- 남은 제약: 핫바 5칸은 데이터 구조와 UI 표시(항상 화면 하단)만 갖춰졌다 — 아직 인벤토리에서 핫바로 아이템을 드래그/할당하는 상호작용도, 핫바에 담긴 아이템을 실제로 "사용"하는 로직(현재 상호작용은 대상 종류별로 자동으로 tool/weapon/rod/sickle 장비를 참조하는 구조라, 핫바 선택이 실제 판정에 아직 아무 영향을 주지 않는다)도 없다. 이는 인벤토리/장비 UI와 마찬가지로 아이템을 얻는 방법(상점/제작/줍기) 자체가 게임에 없기 때문이며, 그 방법이 범위 밖으로 남아있는 한(inbox #4 5번) 핫바도 데이터+UI 이상으로 확장할 근거가 아직 없다.
+- 다음 할 일: `inbox.md`의 #1~#6이 모두 처리 완료 상태다 — 현재 미처리 항목 없음. design.md 로드맵(캐릭터 이동/카메라 → 섬 기본 지형 → 채집/사냥/포획 → 등급·장비 → 튜토리얼 → 캐릭터 커스터마이징/슬롯 → 멀티플레이) 각 단계가 최소 하나의 실질적 구현 + QA 통과 상태에 도달했다고 판단된다. 규칙 7에 따라 세션이 스스로 다음 후보를 골라 진행하지 않고 여기서 멈춘다. 다음에 참고할 후보(직접 코드로 만들지는 않음): 아이템 줍기/제작(인벤토리·핫바·장비 슬롯을 실제로 채울 방법), 핫바 선택이 실제 상호작용 판정에 영향을 주도록 연결, 위 CAUTION들에 남아있던 `animal_hunt`/`animal_capture` 테스트 플레이키니스(status.md #54) 원인 조사.
+
+> [!IMPORTANT]
+> HARNESS_STOP: inbox.md #1~#6 모두 처리 완료 + 미처리 항목 없음 — 자동 루프를 여기서 멈춘다.
