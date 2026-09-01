@@ -94,21 +94,38 @@ func _initialize() -> void:
 		push_error("FAIL: player.hair_type이 선택한 머리종류로 갱신되지 않음 (실제: %s)" % player.hair_type)
 		ok = false
 
-	# FORMAT_RGBA8 텍스처는 채널당 8비트(1/255 단위)로 양자화되므로 완전
-	# 일치 대신 근사 비교(허용오차 1/255보다 넉넉한 0.01)를 쓴다.
+	# inbox.md #8 5번(status.md #65): player.gd가 단색 사각형 대신 머리/몸통
+	# 타원 실루엣 + 3톤 하드 엣지 음영을 그리도록 바뀌어, 고정 좌표 (0,0)이
+	# 더 이상 항상 순수 피부색이라는 보장이 없다(실루엣 밖일 수도, 밝은색/
+	# 그림자 톤일 수도 있음). 실루엣이 차지하는 캔버스 전체 영역에서 기대한
+	# 순수 피부색이 어딘가 나타나는지 찾는 방식으로 검증한다. FORMAT_RGBA8
+	# 텍스처는 채널당 8비트(1/255 단위)로 양자화되므로 완전 일치 대신 근사
+	# 비교(허용오차 1/255보다 넉넉한 0.01)를 쓴다.
 	var image: Image = player.sprite.texture.get_image()
-	var skin_pixel: Color = image.get_pixel(0, 0)
-	var skin_close := (
-		absf(skin_pixel.r - expected_skin.r) < 0.01
-		and absf(skin_pixel.g - expected_skin.g) < 0.01
-		and absf(skin_pixel.b - expected_skin.b) < 0.01
-	)
-	if not skin_close:
-		push_error("FAIL: 플레이어 스프라이트 (0,0) 픽셀이 선택한 피부색이 아님 (실제: %s)" % [skin_pixel])
+
+	var skin_found := false
+	for y in range(32):
+		for x in range(32):
+			var p := image.get_pixel(x, y)
+			if p.a < 0.5:
+				continue
+			if (
+				absf(p.r - expected_skin.r) < 0.01
+				and absf(p.g - expected_skin.g) < 0.01
+				and absf(p.b - expected_skin.b) < 0.01
+			):
+				skin_found = true
+				break
+		if skin_found:
+			break
+	if not skin_found:
+		push_error("FAIL: 플레이어 스프라이트 어디에도 선택한 피부색이 보이지 않음")
 		ok = false
 
-	# 눈은 EYE_LEFT_X=[8,11), EYE_ROWS=[10,13) 범위에 그려진다(player.gd 참고).
-	var eye_pixel: Color = image.get_pixel(9, 11)
+	# 눈은 EYE_LEFT_X=[12,14)/EYE_RIGHT_X=[18,20), EYE_ROWS=[9,11) 범위에
+	# 그려진다(player.gd 참고). 눈은 음영 없이 단일 색으로 칠하므로 좌표
+	# 하나만 확인해도 충분하다.
+	var eye_pixel: Color = image.get_pixel(12, 9)
 	var eye_close := (
 		absf(eye_pixel.r - expected_eye.r) < 0.01
 		and absf(eye_pixel.g - expected_eye.g) < 0.01

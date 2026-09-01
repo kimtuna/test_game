@@ -91,14 +91,27 @@ var skin_color: Color = DEFAULT_SKIN_COLOR
 var eye_color: Color = DEFAULT_EYE_COLOR
 var hair_type: String = DEFAULT_HAIR_TYPE
 
+# inbox.md #8 5번: 첫 실제 도트 스프라이트 적용. tools/sprite_gen.py로 10장의
+# "player_body_base" 후보를 생성해 비교 그리드를 시각적으로 확인하고
+# 선정한 #08(시드 style_v1, status.md #64)의 비례를 그대로 이 상수 세 개로
+# 옮겨왔다 — head_ratio=0.372(머리를 크게 그려 식별하기 쉬움),
+# body_width_ratio=0.637, body_top_ratio=0.302. 아래 그리기 함수들은 이
+# 비례로 정한 머리/몸통 타원 실루엣 기준으로 좌표를 잡는다(전체를 채우던
+# 단색 사각형과 달리, 캔버스 모서리는 이제 투명하다).
+const HEAD_RATIO := 0.372
+const BODY_WIDTH_RATIO := 0.637
+const BODY_TOP_RATIO := 0.302
+const HEAD_CENTER_Y_RATIO := 0.24
+const OUTFIT_START_Y := 20
+
 const HAIR_STYLES: Dictionary = {
-	"short": {"color": Color(0.25, 0.15, 0.05), "x_range": [4, 28]},
-	"mohawk": {"color": Color(0.05, 0.05, 0.05), "x_range": [13, 19]},
+	"short": {"color": Color(0.25, 0.15, 0.05), "x_range": [8, 24]},
+	"mohawk": {"color": Color(0.05, 0.05, 0.05), "x_range": [14, 18]},
 }
-const HAIR_ROWS := [0, 6]
-const EYE_ROWS := [10, 13]
-const EYE_LEFT_X := [8, 11]
-const EYE_RIGHT_X := [21, 24]
+const HAIR_ROWS := [2, 6]
+const EYE_ROWS := [9, 11]
+const EYE_LEFT_X := [12, 14]
+const EYE_RIGHT_X := [18, 20]
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var camera: Camera2D = $Camera2D
@@ -119,23 +132,95 @@ func _ready() -> void:
 	ammo_label.visible = is_multiplayer_authority()
 	_update_ammo_label()
 
-# design.md의 "캐릭터 외형을 커스터마이징할 수 있다"의 첫 조각. 아직 별도
-# 아트 리소스가 없어(범위 밖) 지금까지 절차적 단색 텍스처를 써온 패턴을
-# 그대로 유지하되, 색/모양을 외부(커스터마이징 UI)에서 바꿀 수 있도록 만든
-# 것이 이번 조각에서 새로 생긴 부분이다. 그리는 순서(피부 전체 채우기 ->
-# 머리 -> 눈 -> 하의)가 레이어 순서를 겸한다 — 뒤에 그리는 것이 앞의 것을
-# 덮어쓴다. 머리(x 4~27 또는 13~18)와 눈(x 8~10, 21~23)은 모두 (0,0)/(0,31)
-# 픽셀을 침범하지 않게 x 범위를 잡아, 기존 outfit_headless_test가 검사하던
-# "상의 대 하의" 코너 픽셀 구분이 그대로 유지된다.
+# design.md의 "캐릭터 외형을 커스터마이징할 수 있다"의 첫 조각을 실제 도트
+# 실루엣으로 교체한 버전(inbox.md #8 5번). 이전에는 32x32 전체를 skin_color로
+# 채운 뒤 아래쪽만 OUTFIT_COLOR로 덮는 "단색 사각형"이었다 — assets/ART_STYLE.md
+# 규칙(하드 엣지 3톤 명암, 좌상단 45도 광원)을 지키는 실제 실루엣이 아니었다.
+# 이제 tools/sprite_gen.py로 선정한 머리/몸통 타원 비례(HEAD_RATIO 등)로
+# 사람 형태 실루엣을 그리고, 그 위에 3톤(그림자/기본/밝은색) 하드 엣지 음영을
+# 입힌다 — _three_tone()/_shade_for_position()이 ART_STYLE.md의 공식(그림자
+# V-20%/S+5%, 밝은색 V+15%)을 GDScript로 그대로 구현한 것으로,
+# tools/sprite_gen.py의 동명 함수와 동일한 계산이다(파이썬 쪽은 후보 생성
+# 전용이라 런타임 커스터마이징에는 쓸 수 없어 GDScript에도 같은 공식을 옮겨야
+# 했다). 캔버스 모서리는 실루엣 밖이라 이제 투명하다 — outfit_headless_test/
+# customization_headless_test가 더 이상 (0,0)/(0,31) 코너 픽셀을 검사하지
+# 않는 이유다(테스트도 이번 세션에서 실루엣 내부 영역을 검사하도록 갱신).
 func _apply_appearance() -> void:
 	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
-	image.fill(skin_color)
+	image.fill(Color(0, 0, 0, 0))
+
+	var skin_tones := _three_tone(skin_color)
+	var outfit_tones := _three_tone(OUTFIT_COLOR)
+
+	var head_r := 32.0 * HEAD_RATIO / 2.0
+	var head_cx := 16.0
+	var head_cy := 32.0 * HEAD_CENTER_Y_RATIO
+	var head_x0 := roundi(head_cx - head_r)
+	var head_x1 := roundi(head_cx + head_r)
+	var head_y0 := roundi(head_cy - head_r)
+	var head_y1 := roundi(head_cy + head_r)
+	_draw_shaded_ellipse(image, head_x0, head_y0, head_x1, head_y1, skin_tones)
+
+	var body_w := 32.0 * BODY_WIDTH_RATIO
+	var body_x0 := roundi((32.0 - body_w) / 2.0)
+	var body_x1 := roundi((32.0 + body_w) / 2.0)
+	var body_y0 := roundi(32.0 * BODY_TOP_RATIO)
+	var body_y1 := 32
+	_draw_shaded_ellipse(image, body_x0, body_y0, body_x1, body_y1, skin_tones)
+	# 하의(기본 코디)는 몸통 타원의 아래쪽(OUTFIT_START_Y 이하)만 덮어써서
+	# 실루엣은 그대로 두고 색만 바꾼다 — 별도 타원을 새로 그리면 몸통과 다른
+	# 윤곽이 생겨 실루엣이 어긋난다.
+	_draw_shaded_ellipse(image, body_x0, body_y0, body_x1, body_y1, outfit_tones, OUTFIT_START_Y)
+
 	_draw_hair(image)
 	_draw_eyes(image)
-	for x in range(32):
-		for y in range(20, 32):
-			image.set_pixel(x, y, OUTFIT_COLOR)
 	sprite.texture = ImageTexture.create_from_image(image)
+
+# assets/ART_STYLE.md 3톤 공식(HSV 기준): 그림자 = 명도-20%/채도+5%,
+# 밝은색 = 명도+15%. tools/sprite_gen.py의 three_tone()과 동일한 계산이다.
+func _three_tone(base: Color) -> Dictionary:
+	var shadow := Color.from_hsv(
+		base.h, clampf(base.s + 0.05, 0.0, 1.0), clampf(base.v - 0.20, 0.0, 1.0)
+	)
+	var highlight := Color.from_hsv(base.h, base.s, clampf(base.v + 0.15, 0.0, 1.0))
+	return {"shadow": shadow, "base": base, "highlight": highlight}
+
+# 좌상단 45도 광원 기준 하드 엣지 3톤 분류(dx/dy: bbox 내부 0~1 상대 좌표).
+# tools/sprite_gen.py의 _shade_for_position()과 동일한 공식 — 그라디언트
+# 대신 계단식 경계로만 명암을 나눠 ART_STYLE.md의 "안티앨리어싱 금지" 규칙을
+# 지킨다.
+func _shade_for_position(dx: float, dy: float) -> String:
+	var metric := ((1.0 - dx) + dy) / 2.0
+	if metric > 0.62:
+		return "highlight"
+	if metric < 0.38:
+		return "shadow"
+	return "base"
+
+# bbox(x0,y0,x1,y1) 안에 내접하는 타원을 3톤 하드 엣지로 채운다. min_row을
+# 주면 그 행 위쪽은 건너뛰어(투명 유지) 같은 bbox 안에서 아래쪽 일부만 다른
+# 색으로 덮어쓸 수 있다(하의를 몸통 타원의 아래쪽에만 입히는 용도).
+func _draw_shaded_ellipse(
+	image: Image, x0: int, y0: int, x1: int, y1: int, tones: Dictionary, min_row: int = -1
+) -> void:
+	var w := maxi(1, x1 - x0)
+	var h := maxi(1, y1 - y0)
+	var cx := (x0 + x1) / 2.0
+	var cy := (y0 + y1) / 2.0
+	var rx := w / 2.0
+	var ry := h / 2.0
+	for y in range(y0, y1):
+		if min_row >= 0 and y < min_row:
+			continue
+		for x in range(x0, x1):
+			var nx := (x + 0.5 - cx) / rx
+			var ny := (y + 0.5 - cy) / ry
+			if nx * nx + ny * ny > 1.0:
+				continue
+			var dx := float(x - x0) / w
+			var dy := float(y - y0) / h
+			var tone_key := _shade_for_position(dx, dy)
+			image.set_pixel(x, y, tones[tone_key])
 
 func _draw_hair(image: Image) -> void:
 	if not HAIR_STYLES.has(hair_type):
