@@ -24,3 +24,12 @@ position_smoothing_speed = 8.0
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_1")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="AmmoLabel" type="Label" parent="HUD"]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 260.0
+offset_bottom = 40.0
+text = "일반탄 (사살용) (6/6)"

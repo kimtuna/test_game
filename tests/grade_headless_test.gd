@@ -71,11 +71,16 @@ func _initialize() -> void:
 	for i in range(5):
 		await physics_frame
 
+	# 이 테스트는 등급 게이트를 검증하는 것이지 탄약 소모 자체를 검증하는 게
+	# 아니므로, 반복 발사에도 탄창(기본 6발)이 바닥나지 않도록 넉넉히 채워둔다.
+	player.current_ammo = 999
+	player.ammo_type = "normal"
+
 	# 등급 1 도끼로는 등급 2 동물을 공격할 수 없어야 한다.
 	player.equip("tool", "도끼", 1)
-	Input.action_press("ui_accept")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("ui_accept")
+	Input.action_release("fire")
 	await process_frame
 
 	if health_label.text != "200/200":
@@ -87,9 +92,9 @@ func _initialize() -> void:
 
 	# ATTACK_DAMAGE(31) 기준 6회 공격해야 8%(16) 미만인 14/200에 도달한다.
 	for i in range(6):
-		Input.action_press("ui_accept")
+		Input.action_press("fire")
 		await process_frame
-		Input.action_release("ui_accept")
+		Input.action_release("fire")
 		await process_frame
 
 		var wait_frames := 0
@@ -108,10 +113,11 @@ func _initialize() -> void:
 		ok = false
 
 	# 등급 1 마취총으로는 포획할 수 없어야 한다(체력은 이미 8% 미만).
+	player.ammo_type = "tranquilizer"
 	player.equip("weapon", "마취총", 1)
-	Input.action_press("capture")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("capture")
+	Input.action_release("fire")
 	await process_frame
 
 	if not is_instance_valid(animal2) or not animal2.is_inside_tree():
@@ -120,9 +126,9 @@ func _initialize() -> void:
 
 	# 등급 2 마취총으로 교체하면 포획에 성공해야 한다.
 	player.equip("weapon", "마취총", 2)
-	Input.action_press("capture")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("capture")
+	Input.action_release("fire")
 	await process_frame
 
 	if is_instance_valid(animal2) and animal2.is_inside_tree():

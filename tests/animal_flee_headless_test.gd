@@ -28,9 +28,9 @@ func _initialize() -> void:
 
 	var position_before_attack := animal.global_position
 
-	Input.action_press("ui_accept")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("ui_accept")
+	Input.action_release("fire")
 	await process_frame
 
 	if not animal.is_fleeing:
@@ -74,9 +74,9 @@ func _initialize() -> void:
 		push_error("FAIL: 경계 시나리오에서 player_nearby가 설정되지 않음")
 		ok = false
 
-	Input.action_press("ui_accept")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("ui_accept")
+	Input.action_release("fire")
 	await process_frame
 
 	wait_frames = 0

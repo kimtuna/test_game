@@ -50,8 +50,13 @@ extends Area2D
 #
 # "장비" 단계 첫 조각으로, Player의 장비 슬롯(player.gd의 equipment)이 비어
 # 있으면 공격/포획이 진행되지 않는다. 공격은 "tool"(도끼) 슬롯을, 포획은
-# "weapon"(마취총) 슬롯을 요구한다 — 지금까지 ui_accept가 채집·공격을,
-# capture 액션이 포획을 담당해온 키 구분을 그대로 장비 슬롯 구분에 대응시켰다.
+# "weapon"(마취총) 슬롯을 요구한다.
+#
+# inbox.md #4 2번(status.md #49): 이전까지는 ui_accept가 공격을, 전용 capture
+# 액션이 포획을 담당해 키 입력만으로 둘을 구분했다. 이제 둘 다 좌클릭
+# 발사(fire) 하나로 들어오므로, player.gd에 추가된 ammo_type("normal"=일반탄/
+# 공격, "tranquilizer"=마취탄/포획)으로 어느 쪽을 트리거할지 결정한다.
+# 판정 로직(등급 체크, 체력 8% 미만 포획 조건 등)은 그대로 재사용한다.
 #
 # 이어서 등급(grade)과 장비를 실제로 연결했다: 장착한 도끼/마취총의 grade가
 # 동물의 grade보다 낮으면 각각 공격/포획이 진행되지 않는다. tree.gd와 동일한
@@ -136,10 +141,13 @@ func _on_sound_body_exited(body: Node2D) -> void:
 func _process(_delta: float) -> void:
 	if player_nearby == null:
 		return
-	if Input.is_action_just_pressed("ui_accept"):
-		_attack()
-	elif Input.is_action_just_pressed("capture"):
-		_try_capture()
+	if Input.is_action_just_pressed("fire"):
+		if not player_nearby.try_consume_ammo():
+			return
+		if player_nearby.ammo_type == "tranquilizer":
+			_try_capture()
+		else:
+			_attack()
 
 func _physics_process(delta: float) -> void:
 	if not is_fleeing:

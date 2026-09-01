@@ -77,8 +77,14 @@ func _initialize() -> void:
 		ok = false
 
 	# --- 등급 2 동물: 사냥하면 고기 x2가 나와야 한다 ---
+	# inbox.md #4 2번(status.md #49)로 동물 공격 입력이 ui_accept에서
+	# fire(+ammo_type="normal")로 바뀌었다. 7회 발사가 필요해 기본 탄창(6발)을
+	# 넘으므로, 탄약 소모가 아니라 보상 수량을 검증하는 이 테스트에서는
+	# 넉넉히 채워둔다.
 	var animal2: Area2D = main.get_node("Animal2")
 	player.equip("tool", "도끼", 2)
+	player.ammo_type = "normal"
+	player.current_ammo = 999
 	# ATTACK_DAMAGE(31) 기준 200 체력을 없애려면 7회 공격이 필요하다(31*7=217).
 	for i in range(7):
 		player.global_position = animal2.global_position
@@ -86,9 +92,9 @@ func _initialize() -> void:
 			await physics_frame
 		if not is_instance_valid(animal2) or not animal2.is_inside_tree():
 			break
-		Input.action_press("ui_accept")
+		Input.action_press("fire")
 		await process_frame
-		Input.action_release("ui_accept")
+		Input.action_release("fire")
 		await process_frame
 		var wait_frames := 0
 		while is_instance_valid(animal2) and animal2.is_fleeing and wait_frames < 120:

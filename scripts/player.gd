@@ -25,6 +25,17 @@ var equipment: Dictionary = {
 	"sickle": {"name": "낫", "grade": 1},
 }
 
+# inbox.md #4 2번: 동물 대상 상호작용을 ui_accept/capture 키 입력에서 마우스
+# 기반(좌클릭 발사/우클릭 탄종류 변경/R 재장전)으로 바꾸는 조각. animal.gd의
+# 기존 판정 로직(_attack은 tool 게이트, _try_capture는 weapon 게이트)은 그대로
+# 두고 "무엇을 트리거하는가"만 탄종류로 결정한다 — 좌클릭 발사가 곧 "장착된
+# 총으로 쏜다"는 서술이지만, 실제 판정에 쓰이는 장비 슬롯(tool/weapon)까지
+# 새로 통합하는 것은 이번 지시 범위(입력 방식 교체)를 넘어선다.
+const AMMO_TYPE_NAMES := {"normal": "일반탄 (사살용)", "tranquilizer": "마취탄 (포획용)"}
+const MAGAZINE_SIZE := 6
+var ammo_type: String = "normal"
+var current_ammo: int = MAGAZINE_SIZE
+
 const SPEED := 300.0
 const DEFAULT_BODY_COLOR := Color(0.2, 0.6, 1.0)
 
@@ -44,6 +55,7 @@ var body_color: Color = DEFAULT_BODY_COLOR
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var camera: Camera2D = $Camera2D
+@onready var ammo_label: Label = $HUD/AmmoLabel
 
 func _ready() -> void:
 	add_to_group("player")
@@ -55,6 +67,10 @@ func _ready() -> void:
 	# 보이는 화면인지 엔진이 임의로 결정하는 문제였다. 각 피어는 자신이
 	# 조작하는(authority인) Player의 카메라만 켜야 한다.
 	camera.enabled = is_multiplayer_authority()
+	# 카메라와 동일한 이유로, 탄종류 HUD도 authority가 아닌(원격) Player
+	# 인스턴스에서는 화면에 겹쳐 보이면 안 되므로 꺼둔다.
+	ammo_label.visible = is_multiplayer_authority()
+	_update_ammo_label()
 
 # design.md의 "캐릭터 외형을 커스터마이징할 수 있다"의 첫 조각. 아직 별도
 # 아트 리소스가 없어(범위 밖) 지금까지 절차적 단색 텍스처를 써온 패턴을
@@ -88,6 +104,46 @@ func _physics_process(_delta: float) -> void:
 	var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	velocity = direction * SPEED
 	move_and_slide()
+
+	# 우클릭(탄종류 변경)과 R(재장전)을 처리한다. 발사(좌클릭)는 animal.gd가
+	# player_nearby로 근접 여부를 이미 판정하고 있으므로 그쪽에서 직접
+	# Input.is_action_just_pressed("fire")를 읽는 기존 패턴(ui_accept/capture가
+	# tree.gd/animal.gd에서 쓰던 폴링 방식)과 일관되게, 여기서도 _unhandled_input
+	# 대신 폴링을 쓴다 — 기존 헤드리스 테스트들이 Input.action_press()로 입력을
+	# 흉내내는데, 이 방식은 실제 InputEvent를 만들어 _input/_unhandled_input으로
+	# 전달하지 않고 Input 싱글턴의 폴링 상태만 바꾸기 때문에, 이벤트 콜백
+	# 방식으로 짜면 헤드리스 테스트로 검증할 수 없다.
+	if Input.is_action_just_pressed("switch_ammo"):
+		switch_ammo_type()
+	elif Input.is_action_just_pressed("reload"):
+		reload()
+
+func switch_ammo_type() -> void:
+	var types: Array = AMMO_TYPE_NAMES.keys()
+	var next_index := (types.find(ammo_type) + 1) % types.size()
+	ammo_type = types[next_index]
+	print("탄종류 변경: %s" % AMMO_TYPE_NAMES[ammo_type])
+	_update_ammo_label()
+
+func reload() -> void:
+	current_ammo = MAGAZINE_SIZE
+	print("재장전 완료: %d/%d" % [current_ammo, MAGAZINE_SIZE])
+	_update_ammo_label()
+
+# 발사(좌클릭)가 방아쇠를 당길 때마다 호출된다. 무엇을 맞혔는지와 무관하게
+# (빗나가거나 장비 게이트로 판정이 막히더라도) 탄은 소모된다는 상식적
+# 판단이다. 탄이 없으면 false를 반환해 animal.gd가 공격/포획을 아예
+# 진행하지 않도록 한다.
+func try_consume_ammo() -> bool:
+	if current_ammo <= 0:
+		print("탄창이 비었다. R로 재장전하세요.")
+		return false
+	current_ammo -= 1
+	_update_ammo_label()
+	return true
+
+func _update_ammo_label() -> void:
+	ammo_label.text = "%s (%d/%d)" % [AMMO_TYPE_NAMES[ammo_type], current_ammo, MAGAZINE_SIZE]
 
 func has_equipped(slot: String) -> bool:
 	return equipment.get(slot, {}).get("name", "") != ""
