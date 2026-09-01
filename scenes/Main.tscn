@@ -60,3 +60,33 @@ offset_right = 300.0
 offset_bottom = 288.0
 theme_override_font_sizes/font_size = 24
 text = ""
+
+[node name="TutorialOverlay" type="Control" parent="UI"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Background" type="ColorRect" parent="UI/TutorialOverlay"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="TutorialLabel" type="Label" parent="UI/TutorialOverlay"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -160.0
+offset_right = 260.0
+offset_bottom = 160.0
+theme_override_font_sizes/font_size = 26
+text = "섬에 온 것을 환영합니다
+
+방향키: 이동
+Space / Enter: 나무 채집, 동물 공격
+C: 동물 체력이 8% 미만일 때 마취총으로 포획
+
+아무 키나 눌러 시작하기"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
