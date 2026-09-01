@@ -126,14 +126,36 @@ func _spawn_player(id: int) -> void:
 # 실제 값과 어긋나는 상태로 굳어버렸다. 호스트(id=1)는 다른 헤드리스 테스트가
 # 이미 PLAYER_SPAWN_POSITION을 그대로 가정하고 있어 건드리지 않고, 새로
 # 접속하는 피어만 겹치지 않는 위치로 스폰해 문제의 원인 자체(겹침)를 없앤다.
-const JOINING_PLAYER_SPAWN_OFFSET := Vector2(60, 0)
+#
+# status.md #37은 이 오프셋이 고정 벡터(60, 0)라 동시에(또는 순차적으로) 2명
+# 이상 접속하면 신규 피어 전원이 똑같은 좌표에 다시 겹쳐 스폰되는 한계를
+# 남겼다. 이번 조각은 접속 "순서"를 세는 카운터를 두고, 그 순서에 따라 매번
+# 다른 각도로 회전한 위치에 스폰해 겹침을 없앤다. 원형 배치를 택한 이유는
+# 방향 하나로만 계속 밀면(예: 60,120,180...) 인원이 늘수록 섬 경계(바다)를
+# 넘어갈 수 있는 반면, 반지름을 고정하고 각도만 바꾸면 인원이 아무리 늘어도
+# 스폰 지점에서 벗어나는 거리가 일정하게 유지되기 때문이다. 이 카운터는
+# MultiplayerSpawner가 모든 피어에 같은 순서로 복제하는 spawn(id) 이벤트에
+# 의해서만 증가하므로(각 피어가 로컬 시계로 독립 판단하는 것이 아니라 같은
+# 이벤트 스트림을 같은 순서로 재생), 모든 피어에서 항상 같은 결과에 도달한다.
+const JOINING_PLAYER_SPAWN_RADIUS: float = 60.0
+const JOINING_PLAYER_SPAWN_ANGLE_STEP: float = PI / 4.0
+
+var _join_spawn_index: int = 0
 
 func _create_player_instance(id: int) -> Node:
 	var player := PLAYER_SCENE.instantiate()
 	player.name = _player_node_name(id)
-	player.position = PLAYER_SPAWN_POSITION if id == 1 else PLAYER_SPAWN_POSITION + JOINING_PLAYER_SPAWN_OFFSET
+	if id == 1:
+		player.position = PLAYER_SPAWN_POSITION
+	else:
+		player.position = PLAYER_SPAWN_POSITION + _join_spawn_offset(_join_spawn_index)
+		_join_spawn_index += 1
 	player.set_multiplayer_authority(id)
 	return player
+
+func _join_spawn_offset(index: int) -> Vector2:
+	var angle := index * JOINING_PLAYER_SPAWN_ANGLE_STEP
+	return Vector2(JOINING_PLAYER_SPAWN_RADIUS, 0).rotated(angle)
 
 func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():
