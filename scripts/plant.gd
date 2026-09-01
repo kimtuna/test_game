@@ -2,12 +2,18 @@ extends Area2D
 
 # design.md가 명시한 네 가지 서식 대상(식물/나무/동물/물고기) 중 마지막으로
 # 남아있던 식물. tree.gd/fish.gd(정적 채집물 + 등급 + 장비 게이팅) 패턴을
-# 기반으로 하되, 장비 게이팅은 의도적으로 넣지 않았다 — status.md #40이
-# 남긴 판단대로 "나무보다 가볍고 장비 없이도 채집 가능한 대상"으로
-# 식물을 나무와 차별화하는 것이 design.md 원문("식물, 나무, 동물, 물고기"를
-# 별개 항목으로 나열)에 더 충실하다고 보았다. 대신 등급이 높을수록 더 여러 번
-# 상호작용해야 하는 hits_required=grade 규칙은 그대로 유지해 "높은 등급일수록
-# 채집이 어렵다"는 design.md 요구를 지킨다.
+# 기반으로 한다.
+#
+# status.md #41은 "식물은 나무보다 가볍고 장비 없이도 채집 가능한 대상"으로
+# 장비 게이팅을 의도적으로 뺐었다. 하지만 design.md 원문을 다시 보면
+# "식물/나무/동물/물고기 각각에 등급이 존재하고, 높은 등급일수록 잡거나
+# 채집하기 어렵다. 유저는 더 높은 등급을 상대하기 위해 장비를 맞춰(강화/교체)
+# 나간다"고 네 대상 모두에 동일한 원칙을 명시하고 있다 — 즉 식물만 예외로
+# 두면 design.md의 핵심 문장과 어긋난다. 이번 조각에서 그 결정을 뒤집어,
+# 나무/물고기와 동일하게 전용 장비 슬롯("sickle", 낫)을 요구하도록 바꿨다.
+# 종류별로 별도 슬롯을 쓰는 이유(도끼/마취총/낚싯대와 동일)도 그대로다 —
+# 대상별로 "장비를 맞춰 나간다"는 문장이 의미를 가지려면 자원별로 구분된
+# 장비가 있어야 한다.
 
 signal harvested(resource_name: String, amount: int)
 
@@ -39,6 +45,12 @@ func _process(_delta: float) -> void:
 		_register_hit()
 
 func _register_hit() -> void:
+	if not player_nearby.has_equipped("sickle"):
+		print("낫이 없어 채집할 수 없다.")
+		return
+	if player_nearby.get_equipment_grade("sickle") < grade:
+		print("낫 등급이 부족해 채집할 수 없다. (필요 등급: %d, 보유 등급: %d)" % [grade, player_nearby.get_equipment_grade("sickle")])
+		return
 	hits_taken += 1
 	if hits_taken >= grade:
 		_harvest()

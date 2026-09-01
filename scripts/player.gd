@@ -22,6 +22,7 @@ var equipment: Dictionary = {
 	"tool": {"name": "도끼", "grade": 1},
 	"weapon": {"name": "마취총", "grade": 1},
 	"rod": {"name": "낚싯대", "grade": 1},
+	"sickle": {"name": "낫", "grade": 1},
 }
 
 const SPEED := 300.0

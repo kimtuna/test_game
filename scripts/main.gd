@@ -22,6 +22,7 @@ const RESOURCE_TO_SLOT: Dictionary = {
 	"통나무": "tool",
 	"고기": "weapon",
 	"물고기": "rod",
+	"채소": "sickle",
 }
 
 var inventory: Dictionary = {}

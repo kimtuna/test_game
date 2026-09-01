@@ -2,10 +2,11 @@ extends SceneTree
 
 # 헤드리스 환경에서 식물 채집 상호작용을 검증하는 통합 테스트.
 # 실행: godot --headless --path . --script res://tests/plant_harvest_headless_test.gd
-# tree_harvest_headless_test.gd와 동일한 패턴(범위 밖 무반응 -> 범위 안 이동 ->
-# 상호작용 -> 인벤토리 반영 확인)에, plant.gd는 tree.gd/fish.gd와 달리 장비
-# 게이팅이 없다는 차이를 확인하기 위해 아무 장비도 장착하지 않은 상태에서
-# 채집이 성립하는지도 함께 검증한다.
+# tree_harvest_headless_test.gd/fish_harvest_headless_test.gd와 동일한 패턴
+# (범위 밖 무반응 -> 범위 안 이동 -> 상호작용 -> 인벤토리 반영 확인)에, plant.gd가
+# 나무/물고기와 동일한 장비 게이팅 패턴(이번 세션에서 새로 연결한 "sickle" 슬롯)을
+# 실제로 따르는지 확인하기 위해 낫을 해제한 상태에서는 채집이 되지 않는 케이스도
+# 함께 검증한다.
 
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
@@ -28,12 +29,8 @@ func _initialize() -> void:
 		push_error("FAIL: 범위 밖인데도 식물이 채집됨")
 		ok = false
 
-	# 장비를 전혀 장착하지 않은 상태에서도 식물은 채집 가능해야 한다
-	# (tree/fish와 달리 식물은 장비 게이팅이 없는 것이 이번 조각의 핵심 차이).
-	player.unequip("tool")
-	player.unequip("weapon")
-	player.unequip("rod")
-
+	# 낫을 해제한 상태에서는 범위 안이어도 채집이 되지 않아야 한다.
+	player.unequip("sickle")
 	player.global_position = plant.global_position
 	for i in range(5):
 		await physics_frame
@@ -47,8 +44,19 @@ func _initialize() -> void:
 	Input.action_release("ui_accept")
 	await process_frame
 
+	if not is_instance_valid(plant) or plant.is_inside_tree() == false:
+		push_error("FAIL: 낫 없이도 식물이 채집됨")
+		ok = false
+
+	# 낫을 다시 장착하면 채집이 성립해야 한다.
+	player.equip("sickle", "낫", 1)
+	Input.action_press("ui_accept")
+	await process_frame
+	Input.action_release("ui_accept")
+	await process_frame
+
 	if is_instance_valid(plant) and plant.is_inside_tree():
-		push_error("FAIL: 장비 없이 범위 안에서 ui_accept를 눌렀는데도 식물이 사라지지 않음")
+		push_error("FAIL: 범위 안에서 낫을 장착하고 ui_accept를 눌렀는데도 식물이 사라지지 않음")
 		ok = false
 
 	var inventory_label: Label = main.get_node("UI/InventoryLabel")
