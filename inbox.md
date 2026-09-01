@@ -183,3 +183,26 @@ design.md를 "동물의 숲 스타일 나만의 섬" 기획으로 전면 교체�
 근거: 향후 PvP 계획이 있는 게임에서 해상도가 경쟁적 이점으로 이어지면 안 된다는 사용자의 명확한 설계 의도.
 
 상태: 처리 완료 (status.md #71 — `window/stretch/aspect="keep"` 명시적 설정 + 기존 해상도 목록이 전부 16:9임을 확인)
+
+---
+
+### #12 — 2026-09-02 05:16
+
+배경: 사용자가 실제로 플레이하며 확인 — 설정 메뉴에 해상도 선택 칸은 나오는데, 골라도 실제 창 크기가 안 바뀐다(inbox #10/#11로 구현된 기능이 작동하지 않음).
+
+사람이 직접 원인을 조사하다가, **에디터가 `project.godot`를 계속 건드리는 문제를 실시간으로 다시 목격했다** — `window/stretch/aspect="keep"`이 사람이 방금 확인하는 사이에 또 지워져 있었다(git diff로 확인, 복구함). 에디터가 테스트를 위해 열려있는 동안 `project.godot`의 `[display]` 섹션이 반복적으로 유실되는 게 재현되고 있다. `scripts/game_settings.gd`(inbox #10)는 창 "크기"(`get_window().size`)만 런타임 코드로 지정하고 있고, "화면비 유지 모드"(`content_scale_aspect`)와 "기준 해상도"(`content_scale_size`)는 여전히 `project.godot`의 정적 설정에 의존하고 있어 — 그 정적 설정이 지워지면 스트레치 계산이 꼬여서 창 크기 변경이 눈에 보이는 효과를 못 낼 수 있다(정확한 인과관계까지는 사람이 확인 못했지만, 유력한 원인 후보).
+
+지시 내용:
+
+1. **화면비/기준 해상도까지 전부 런타임 코드로 옮길 것** — `project.godot`의 `[display]` 설정에 더 이상 의존하지 않는다. `scripts/game_settings.gd`(또는 적절한 곳)에서 게임 시작 시 다음을 명시적으로 코드로 설정할 것:
+   - `get_window().content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS`
+   - `get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP`
+   - `get_window().content_scale_size = Vector2i(기준 너비, 기준 높이)` — 해상도가 뭘로 바뀌든 이 기준값은 절대 바뀌지 않아야 한다(inbox #11의 공정성 요구사항과 직결).
+   - 그 다음에 `get_window().size = 선택한 해상도`
+   - `project.godot`에 남아있는 `window/stretch/*` 설정은 지금처럼 에디터가 계속 지울 수 있으니, 있으면 참고만 하고 실제 동작은 위 코드가 전적으로 책임지게 만든다.
+2. **실제로 창 크기가 바뀌는지 검증 가능한 방법을 찾을 것.** 헤드리스 환경은 디스플레이가 없어 시각적 확인이 안 되므로, 예를 들어 `set_resolution()` 호출 직후 `get_window().size`를 다시 읽어서 실제로 요청한 값과 같은지 확인하는 헤드리스 테스트를 만들어 회귀를 잡을 것(창이 시각적으로 "보기 좋은지"까지는 사람 확인이 필요하지만, 최소한 "설정한 값이 실제로 적용됐는지"는 코드로 확인 가능하다).
+3. 원인을 정확히 특정하지 못했다면(추측이 틀렸다면), `status.md`에 실제로 확인한 원인을 남기고 그에 맞게 고칠 것 — 위 진단은 사람의 유력한 추정이지 확정된 사실이 아니다.
+
+참고: 지금 하네스 작업과 충돌하지 않도록 Godot 에디터를 닫아뒀다(테스트 중 계속 project.godot를 건드리는 게 확인돼서). 이 지시가 끝나면 사용자가 다시 `test_game-play`로 열어서 확인할 것이다.
+
+상태: 미처리
