@@ -33,6 +33,7 @@ var player_nearby: CharacterBody2D = null
 var is_fleeing: bool = false
 var flee_timer: float = 0.0
 var flee_direction: Vector2 = Vector2.ZERO
+var terrain: Node = null
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var health_label: Label = $HealthLabel
@@ -44,6 +45,7 @@ func _ready() -> void:
 	body_exited.connect(_on_body_exited)
 	sprite.texture = _create_animal_texture()
 	_update_health_label()
+	terrain = get_tree().get_first_node_in_group("terrain")
 
 func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("player"):
@@ -65,6 +67,10 @@ func _physics_process(delta: float) -> void:
 	if not is_fleeing:
 		return
 	global_position += flee_direction * FLEE_SPEED * delta
+	if terrain != null:
+		var bounds: Rect2 = terrain.get_island_bounds()
+		global_position.x = clamp(global_position.x, bounds.position.x, bounds.end.x)
+		global_position.y = clamp(global_position.y, bounds.position.y, bounds.end.y)
 	flee_timer -= delta
 	if flee_timer <= 0.0:
 		is_fleeing = false

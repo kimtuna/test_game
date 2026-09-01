@@ -8,9 +8,17 @@ const WALL_THICKNESS := 40.0
 @onready var island: Sprite2D = $Island
 
 func _ready() -> void:
+	add_to_group("terrain")
 	_set_flat_texture(ocean, OCEAN_SIZE, Color(0.2, 0.5, 0.8))
 	_set_flat_texture(island, ISLAND_SIZE, Color(0.35, 0.65, 0.25))
 	_create_boundary_walls(island.position, ISLAND_SIZE)
+
+# 섬의 경계 사각형(월드 좌표)을 반환한다. 도주 중인 동물처럼 물리 충돌 없이
+# 직접 global_position을 옮기는 대상이 섬 밖(바다)으로 나가지 않도록
+# 클램프할 때 쓴다. ISLAND_SIZE를 여기 한 곳에서만 정의하고 다른 스크립트는
+# 이 함수로 조회하게 해, 크기가 바뀌어도 값이 어긋나지 않게 한다.
+func get_island_bounds() -> Rect2:
+	return Rect2(island.position - ISLAND_SIZE / 2.0, ISLAND_SIZE)
 
 func _set_flat_texture(sprite: Sprite2D, size: Vector2, color: Color) -> void:
 	var image := Image.create(int(size.x), int(size.y), false, Image.FORMAT_RGBA8)

@@ -57,8 +57,39 @@ func _initialize() -> void:
 		push_error("FAIL: 도주 후에도 동물이 거의 이동하지 않음 (moved_distance=%.1f)" % moved_distance)
 		ok = false
 
+	# --- 두 번째 시나리오: 섬 경계 근처에서 도주해도 바다로 나가지 않는지 확인 ---
+	# (status.md #21이 남긴 제약: Animal은 Area2D라 IslandBounds와 물리적으로
+	# 충돌하지 않으므로, 도주 방향이 바다 쪽이면 섬 밖으로 나갈 수 있었다.)
+	var terrain: Node = main.get_node("Terrain")
+	var bounds: Rect2 = terrain.get_island_bounds()
+
+	animal.is_fleeing = false
+	animal.flee_timer = 0.0
+	animal.global_position = Vector2(bounds.end.x - 20.0, bounds.position.y + bounds.size.y / 2.0)
+	player.global_position = animal.global_position + Vector2(-40, 0)
+	for i in range(5):
+		await physics_frame
+
+	if animal.player_nearby == null:
+		push_error("FAIL: 경계 시나리오에서 player_nearby가 설정되지 않음")
+		ok = false
+
+	Input.action_press("ui_accept")
+	await process_frame
+	Input.action_release("ui_accept")
+	await process_frame
+
+	wait_frames = 0
+	while animal.is_fleeing and wait_frames < 120:
+		await physics_frame
+		wait_frames += 1
+
+	if animal.global_position.x > bounds.end.x + 0.5:
+		push_error("FAIL: 도주 중 동물이 섬 경계(바다 쪽)를 넘어감 (x=%.1f, island_right_edge=%.1f)" % [animal.global_position.x, bounds.end.x])
+		ok = false
+
 	if ok:
-		print("HEADLESS_ANIMAL_FLEE_TEST: PASS (moved_distance=%.1f)" % moved_distance)
+		print("HEADLESS_ANIMAL_FLEE_TEST: PASS (moved_distance=%.1f, boundary_x=%.1f, island_right_edge=%.1f)" % [moved_distance, animal.global_position.x, bounds.end.x])
 		quit(0)
 	else:
 		print("HEADLESS_ANIMAL_FLEE_TEST: FAIL")
