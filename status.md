@@ -273,3 +273,27 @@
 > QA 중 `animal_hunt_headless_test`와 `animal_capture_headless_test` 두 개가 실패(전자는 최초 실행 시 5분 넘게 멈춘 뒤 결국 FAIL, 후자는 즉시 FAIL)하는 것을 발견했다. 원인을 좁히기 위해 `git stash`로 이번 세션의 변경을 완전히 제거한 원래 코드에서 같은 두 테스트를 다시 돌려봤는데, 변경 전 코드에서도 동일하게 FAIL했다(`animal_hunt`: "1회 공격 후 체력 라벨이 기대한 값(69/100)이 아님(실제: 38/100)" — 즉 한 번의 fire 입력 사이클에서 공격이 두 번 들어감, `animal_capture`: 마취탄 발사 전에 이미 여러 발이 들어가 포획 시점에 체력이 예상과 달라짐). 즉 이번 세션이 만든 버그가 아니라, `Input.action_press`/`action_release` + `await process_frame`만으로 물리 프레임 타이밍을 흉내내는 기존 테스트 패턴 자체에 있던 사전 존재 플레이키니스(가끔 한 번의 "눌림"이 두 물리 프레임에 걸쳐 두 번 소비됨)로 판단했다. 이번 세션 범위(조준 방향 버그 수정)와 무관하고, 재현이 결정론적이지도 않아(같은 코드로 재실행하면 통과할 때도, 실패할 때도 있음) 이번 세션에서 고치지 않고 다음에 참고하도록 여기 남긴다. 다만 최초 실행에서 `animal_hunt_headless_test.gd` 프로세스(PID 56652)가 5분 넘게 멈춰 있다가 이 세션의 Bash 권한(`Bash(godot *)`만 허용, `kill`은 미허용)으로는 정리하지 못한 채 남아있을 수 있다 — 사용자가 직접 `kill`로 정리해야 할 수 있다.
 - 남은 제약: 조준선은 authority인 로컬 플레이어에게 항상 표시되며, 특정 장비를 들고 있을 때만 보이게 하는 게이팅은 없다(위 판단 근거 참고). `inbox.md` #6의 3번(인벤토리 E키 9칸)/4번(장비 슬롯 7종)/5번(핫바 1~5)은 아직 미착수 — "여러 세션에 걸쳐 순서대로 처리"가 명시된 지시라 다음 세션이 이어받아야 한다. 위 CAUTION의 `animal_hunt`/`animal_capture` 테스트 플레이키니스는 미해결 상태로 남아있다(원인은 좁혔으나 고치지는 않음).
 - 다음 할 일: 다음 세션은 `inbox.md` #6의 3번(인벤토리, E키, 9칸, 마인크래프트/코어키퍼 참고)부터 이어받을 것을 권장한다. 여유가 있다면 위 CAUTION에 남긴 `animal_hunt_headless_test`/`animal_capture_headless_test`의 fire 입력 이중 소비 플레이키니스 원인 조사(테스트의 `Input.action_press`/`action_release` 타이밍 문제로 추정)도 별도로 다뤄볼 만하다. `inbox.md` #6에 아직 3~5번이 남아있으므로 규칙 7에 따라 `HARNESS_STOP`을 남기지 않고 다음 세션이 계속 이어간다.
+
+---
+
+### #55 — 2026-09-02 03:16 (수동 실행, 사용자가 하네스 사이클 1회를 직접 요청)
+
+- 계기: `inbox.md` #6(부분 처리 중)을 이어받았다 — status.md #54가 다음으로 권장한 3번(인벤토리, E키, 9칸, 마인크래프트/코어키퍼 참고)을 규칙 4(기능 하나만)에 따라 이번 세션의 조각으로 골랐다. 4번(장비 슬롯 7종)·5번(핫바 1~5)은 이번에 손대지 않았다 — inbox #6 자체가 "여러 세션에 걸쳐 순서대로 처리"를 명시했다.
+- 한 일:
+  - `scenes/Main.tscn`의 `UI` 아래 `InventoryOverlay`(반투명 배경 + "인벤토리 (E로 닫기)" 제목 + 3x3 `GridContainer`, 슬롯 9개 `Panel`+`SlotLabel`) 신설. `scripts/main.gd`의 `_unhandled_input`에 E키 분기를 추가했다 — 다른 오버레이(슬롯/커스터마이징/튜토리얼)가 열려있지 않고 일시정지 상태가 아닐 때만 E로 열리고, 열린 상태에서 E를 다시 누르면 닫힌다.
+  - 핵심 판단: 인벤토리 오버레이는 `pause_overlay.gd`와 달리 `get_tree().paused`를 건드리지 않는 단순 시각 토글로 만들었다. design.md의 멀티플레이(세션 서버) 로드맵을 고려하면, 인벤토리를 열 때마다 SceneTree 전체를 멈추면 한 명이 인벤토리를 확인하는 동안 같은 세션의 다른 플레이어까지 함께 멈추게 되므로 부적절하다고 판단했다.
+  - 용량 구현: 기존 `main.gd`의 `inventory: Dictionary`(자원 종류 -> 개수)는 종류 수 제한이 전혀 없었다. `INVENTORY_CAPACITY = 9`를 추가하고 `_on_harvested()`에서 "이미 갖고 있는 종류를 더 얻는 것"은 계속 허용하되, "9종을 이미 채운 상태에서 새로운 종류를 얻으려는 시도"는 거부(자원 손실, 콘솔에 안내 문구)하도록 했다. design.md/inbox 어디에도 초과분 처리(드롭, 교체 등)가 명시되지 않았고 바닥에 아이템을 버리는 시스템 자체가 아직 없어(제작/줍기와 함께 범위 밖, inbox #4 5번) 가장 단순한 기본값으로 판단했다.
+  - `_update_inventory_grid()`: `inventory.keys()` 순서대로 9칸에 "이름\n개수"를 채우고 남는 칸은 "-"로 표시한다. 아이콘 리소스가 없어(범위 밖, design.md "아트 스타일") 텍스트만 표시했다 — 기존 `InventoryLabel`(항상 보이는 목록형 표시)과 별개로 유지, 서로 충돌하지 않는다.
+  - `TutorialOverlay` 안내 문구에 "E: 인벤토리 (9칸)" 한 줄 추가(status.md #50/#51이 이미 조작 변경 시 이 문구를 함께 갱신해온 패턴을 따름).
+  - 신규 헤드리스 테스트 `tests/inventory_headless_test.gd`: 실제 플레이 상태에서 (1) E로 열림/닫힘 + `paused`가 바뀌지 않는지, (2) `main._on_harvested()`로 얻은 자원이 그리드에 "이름\n개수"로 표시되는지, (3) 서로 다른 9종을 채운 뒤 10번째 새 종류는 거부되고(`inventory.size()`가 9를 넘지 않음) 이미 있던 종류는 계속 늘어나는지 확인한다. 실제 씬의 자원 종류가 4종뿐이라(통나무/고기/물고기/채소) 9종을 자연스럽게 모을 수 없어, `equipment_upgrade_headless_test.gd`와 동일한 방식으로 `main._on_harvested()`를 직접 호출해 상황을 흉내냈다.
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음).
+  - 이번 변경과 직접 관련된 테스트만 재실행(규칙 4 QA 지침): `inventory_headless_test`(`PASS`, 신규), `pause_menu_headless_test`(`PASS`, 같은 `_unhandled_input` 오버레이 우선순위 체인에 새 분기를 끼워넣은 변경이라 ESC 흐름이 깨지지 않았는지 확인), `mainmenu_headless_test`(`PASS`), `slot_headless_test`(`PASS`), `customization_headless_test`(`PASS`), `tutorial_headless_test`(`PASS`, 문구 변경 확인), `equipment_upgrade_headless_test`(`PASS`, `_on_harvested()`에 용량 체크를 추가한 변경이 기존 승급 경로를 깨지 않았는지 확인), `save_load_headless_test`(`PASS`) 모두 통과. `ps aux`로 확인한 결과 남은 godot 프로세스는 없었다.
+
+> [!CAUTION]
+> 신규 테스트 작성 중 두 가지를 실수로 잘못 짚어 QA 단계에서 고쳤다(둘 다 로직 버그가 아니라 테스트 코드 자체의 오류였다).
+> 1) `SceneTree`를 상속하는 헤드리스 테스트에서 `get_tree().paused`를 썼다가 "Function get_tree() not found in base self" 파싱 에러가 났다 — `SceneTree` 자신에는 `get_tree()`가 없고(그건 `Node`의 메서드), `paused`는 `SceneTree` 자신의 프로퍼티라 `paused`로 직접 읽어야 한다(기존 `pause_menu_headless_test.gd`가 이미 이렇게 쓰고 있었는데 이번에 새로 옮겨적으며 놓쳤다). `get_tree()` 없이 `paused`로 고쳤다.
+> 2) 용량이 가득 찬 뒤에도 "이미 있던 종류는 계속 늘어나야 한다"를 검증하려고 "통나무"를 재사용했는데, "통나무"는 `RESOURCE_TO_SLOT`에 매핑된 자원이라 `_try_upgrade_equipment()`가 끼어들어 5개가 쌓이는 순간 장비 승급 비용으로 자동 소비돼(기존 의도된 동작) 개수가 0으로 변해 테스트가 실패했다. 이건 테스트가 세운 시나리오가 실제 게임 로직(장비 자동 승급)과 우연히 충돌한 것이지 인벤토리 용량 로직의 버그는 아니었다 — 장비 슬롯에 매핑되지 않은 "자원1"(테스트가 앞서 만든 자원)으로 바꿔서 검증하도록 고쳤다.
+> 재확인 결과: `inventory_headless_test`(PASS)를 포함해 위 확인 항목 전체가 정상 통과했다.
+- 남은 제약: 인벤토리는 열려 있어도 플레이어 이동/발사를 막지 않는다(design.md/inbox가 이동 잠금을 요구하지 않았고, 새로 잠금 로직을 추가하면 규칙 4를 넘어서는 별개의 결정이 된다고 판단). 슬롯 안에는 아이콘 없이 텍스트(이름+개수)만 표시한다(아트 리소스 범위 밖). 9칸을 넘겼을 때 자원은 그냥 버려진다 — 드롭/교체 UI는 없다. `inbox.md` #6의 4번(장비 슬롯 7종)·5번(핫바 1~5)은 아직 미착수.
+- 다음 할 일: 다음 세션은 `inbox.md` #6의 4번(모자/상의/하의/신발/귀걸이/반지/가방 7종 장비 슬롯)부터 이어받을 것을 권장한다. `inbox.md` #6에 아직 4~5번이 남아있으므로 규칙 7에 따라 `HARNESS_STOP`을 남기지 않고 다음 세션이 계속 이어간다.
