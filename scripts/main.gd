@@ -115,10 +115,23 @@ func _spawn_player(id: int) -> void:
 # is_multiplayer_authority() 체크가 모든 피어에서 "이 Player는 id 피어가
 # 조작한다"는 동일한 결론에 도달한다 — set_multiplayer_authority를 서버에서만
 # 호출하면 그 값은 로컬에만 적용되고 다른 피어에는 전달되지 않기 때문이다.
+#
+# 클라이언트 -> 서버 위치 동기화를 실측(tests/network_client_to_server_sync_headless_test.gd)
+# 하다가 발견한 문제: 호스트(id=1)와 새로 접속한 피어가 똑같은
+# PLAYER_SPAWN_POSITION에 겹쳐서 스폰되면, Godot의 CharacterBody2D가 "새로
+# 생성된 바디가 다른 바디와 겹친 상태로 첫 물리 프레임을 맞으면 자동으로
+# 겹침에서 빠져나오려 한다"는 특성 때문에(velocity가 0이어도 move_and_slide()
+# 호출 시 발생) 새로 스폰된 쪽이 스스로도 모르게 몇십 픽셀 밀려나고, 그 순간의
+# 위치가 위치 동기화(스폰 시점 스냅샷)와 뒤엉켜 다른 피어가 보는 좌표가
+# 실제 값과 어긋나는 상태로 굳어버렸다. 호스트(id=1)는 다른 헤드리스 테스트가
+# 이미 PLAYER_SPAWN_POSITION을 그대로 가정하고 있어 건드리지 않고, 새로
+# 접속하는 피어만 겹치지 않는 위치로 스폰해 문제의 원인 자체(겹침)를 없앤다.
+const JOINING_PLAYER_SPAWN_OFFSET := Vector2(60, 0)
+
 func _create_player_instance(id: int) -> Node:
 	var player := PLAYER_SCENE.instantiate()
 	player.name = _player_node_name(id)
-	player.position = PLAYER_SPAWN_POSITION
+	player.position = PLAYER_SPAWN_POSITION if id == 1 else PLAYER_SPAWN_POSITION + JOINING_PLAYER_SPAWN_OFFSET
 	player.set_multiplayer_authority(id)
 	return player
 
