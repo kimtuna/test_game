@@ -16,6 +16,9 @@ script = ExtResource("2")
 [node name="Ocean" type="Sprite2D" parent="Terrain"]
 position = Vector2(576, 324)
 
+[node name="Beach" type="Sprite2D" parent="Terrain"]
+position = Vector2(576, 324)
+
 [node name="Island" type="Sprite2D" parent="Terrain"]
 position = Vector2(576, 324)
 
