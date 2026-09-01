@@ -76,6 +76,16 @@ extends Area2D
 # 여전히 "완전히 붙어있을 때는 조준 방향과 무관하게 맞는다"는 최소 사거리
 # 처리(player.gd의 POINT_BLANK_DISTANCE)와 기존 헤드리스 테스트의 근접 확인
 # 용도로 쓰인다.
+#
+# inbox.md #9 2~4번: 절차적 단색 사각형을 PixelLab으로 생성한 실제 사슴 도트
+# 그림(assets/sprites/animal/deer_base.png, 정지 상태 + deer_walk_00~15.png,
+# 걷기 16프레임)으로 교체했다. player.gd의 걷기 애니메이션 패턴(WALK_FRAME_
+# DURATION마다 프레임 순환, 멈추면 즉시 첫 프레임/기본 텍스처로 복귀)을 그대로
+# 재사용했다 — 이 동물은 도주(is_fleeing) 중에만 실제로 이동하므로, "이동
+# 중"의 기준을 player처럼 입력 방향이 아니라 is_fleeing으로 잡았다. 현재
+# 게임에 동물 종류가 사슴 하나뿐이라(scenes/Main.tscn에 Animal 인스턴스 1개)
+# 텍스처 경로를 사슴 전용으로 하드코딩했다 — 종류가 늘어나면 텍스처 셋을
+# 파라미터화해야 한다(다음 세션 과제, 지금은 범위 밖).
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -85,6 +95,11 @@ const ATTACK_DAMAGE: int = 31
 const CAPTURE_HEALTH_RATIO: float = 0.08
 const FLEE_SPEED: float = 220.0
 const FLEE_DURATION: float = 0.6
+
+const BASE_TEXTURE_PATH := "res://assets/sprites/animal/deer_base.png"
+const WALK_FRAME_COUNT := 16
+const WALK_FRAME_PATH_FORMAT := "res://assets/sprites/animal/deer_walk_%02d.png"
+const WALK_FRAME_DURATION := 0.08
 
 @export_range(1, 3) var grade: int = 1
 
@@ -97,6 +112,12 @@ var is_fleeing: bool = false
 var flee_timer: float = 0.0
 var flee_direction: Vector2 = Vector2.ZERO
 var terrain: Node = null
+
+var base_texture: Texture2D = null
+var walk_frames: Array[Texture2D] = []
+var is_walking: bool = false
+var walk_timer: float = 0.0
+var walk_frame_index: int = 0
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var health_label: Label = $HealthLabel
@@ -113,7 +134,10 @@ func _ready() -> void:
 	sight_area.body_exited.connect(_on_sight_body_exited)
 	sound_area.body_entered.connect(_on_sound_body_entered)
 	sound_area.body_exited.connect(_on_sound_body_exited)
-	sprite.texture = _create_animal_texture()
+	base_texture = load(BASE_TEXTURE_PATH)
+	for i in range(WALK_FRAME_COUNT):
+		walk_frames.append(load(WALK_FRAME_PATH_FORMAT % i))
+	sprite.texture = base_texture
 	max_health = MAX_HEALTH * grade
 	health = max_health
 	grade_label.text = "Lv.%d" % grade
@@ -164,6 +188,7 @@ func _physics_process(delta: float) -> void:
 		if player_in_sound_range != null and player_in_sound_range.velocity.length() > 0.0:
 			_start_fleeing(player_in_sound_range)
 		else:
+			_update_walk_animation(delta, false)
 			return
 	global_position += flee_direction * FLEE_SPEED * delta
 	if terrain != null:
@@ -173,6 +198,26 @@ func _physics_process(delta: float) -> void:
 	flee_timer -= delta
 	if flee_timer <= 0.0:
 		is_fleeing = false
+	_update_walk_animation(delta, is_fleeing)
+
+# player.gd의 _update_walk_animation과 동일한 패턴(inbox #9 4번) — 이동 중일
+# 때만 WALK_FRAME_DURATION마다 프레임을 순환시키고, 멈추면 즉시 정지 텍스처
+# (deer_base.png)로 되돌린다. 이 동물은 도주(is_fleeing) 상태가 곧 "이동
+# 중"이므로 player처럼 입력 방향 대신 moving 인자에 is_fleeing을 그대로 넘긴다.
+func _update_walk_animation(delta: float, moving: bool) -> void:
+	if not moving:
+		if is_walking:
+			is_walking = false
+			walk_timer = 0.0
+			walk_frame_index = 0
+			sprite.texture = base_texture
+		return
+	is_walking = true
+	walk_timer += delta
+	if walk_timer >= WALK_FRAME_DURATION:
+		walk_timer -= WALK_FRAME_DURATION
+		walk_frame_index = (walk_frame_index + 1) % walk_frames.size()
+		sprite.texture = walk_frames[walk_frame_index]
 
 func _attack(shooter: CharacterBody2D) -> void:
 	if not shooter.has_equipped("tool"):
@@ -217,11 +262,3 @@ func _try_capture(shooter: CharacterBody2D) -> void:
 
 func _update_health_label() -> void:
 	health_label.text = "%d/%d" % [health, max_health]
-
-func _create_animal_texture() -> ImageTexture:
-	var image := Image.create(40, 32, false, Image.FORMAT_RGBA8)
-	image.fill(Color(0, 0, 0, 0))
-	for x in range(40):
-		for y in range(32):
-			image.set_pixel(x, y, Color(0.6, 0.4, 0.2))
-	return ImageTexture.create_from_image(image)
