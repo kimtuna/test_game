@@ -231,8 +231,10 @@ func _on_peer_disconnected(id: int) -> void:
 # 슬롯이면 메모리에 있는 slot_colors를 즉시 적용하고, (2) 세션 중엔 처음
 # 골랐지만 디스크에 저장 파일이 있는 슬롯이면 그 파일을 불러와 적용하고
 # (_apply_slot_data), (3) 저장 파일도 없는 진짜 새 슬롯이면 커스터마이징
-# 오버레이로 이어진다. 게임 중에도 Tab 키로 언제든 슬롯 오버레이를 다시 열어
-# 슬롯을 바꿀 수 있다. 계정 시스템(로그인 등)은 여전히 범위 밖이다.
+# 오버레이로 이어진다. 슬롯 선택은 게임 시작(메인 메뉴) 시점에만 하며, 게임
+# 플레이 중에는 슬롯을 바꾸는 기능이 없다(inbox.md #7 1번 — Tab으로 여는
+# 방식은 의도치 않게 열리는 사고가 있어 제거했다). 계정 시스템(로그인 등)은
+# 여전히 범위 밖이다.
 #
 # status.md #50이 남긴 "게임 중 메인 메뉴로 나가는 흐름" 공백을 메우는 조각.
 # 다른 오버레이(슬롯/커스터마이징/튜토리얼)가 떠 있지 않을 때만 ESC로
@@ -309,11 +311,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.keycode == KEY_ESCAPE:
 		pause_overlay.visible = true
 		get_tree().paused = true
-		get_viewport().set_input_as_handled()
-		return
-
-	if event.keycode == KEY_TAB:
-		slot_overlay.visible = true
 		get_viewport().set_input_as_handled()
 		return
 
