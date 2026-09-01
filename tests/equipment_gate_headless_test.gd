@@ -31,9 +31,9 @@ func _initialize() -> void:
 		ok = false
 
 	player.unequip("tool")
-	Input.action_press("ui_accept")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("ui_accept")
+	Input.action_release("fire")
 	await process_frame
 	if not is_instance_valid(tree) or not tree.is_inside_tree() or tree.hits_taken != 0:
 		push_error("FAIL: 도끼 없이도 나무 채집(hits_taken 증가 또는 사라짐)이 진행됨")
@@ -41,9 +41,9 @@ func _initialize() -> void:
 
 	# 도끼를 다시 장착하면 정상적으로 채집된다(grade=1이므로 1회면 충분).
 	player.equip("tool", "도끼")
-	Input.action_press("ui_accept")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("ui_accept")
+	Input.action_release("fire")
 	await process_frame
 	if is_instance_valid(tree) and tree.is_inside_tree():
 		push_error("FAIL: 도끼를 재장착했는데도 나무가 채집되지 않음")

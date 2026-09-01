@@ -43,9 +43,9 @@ func _initialize() -> void:
 	player1.global_position = tree1.global_position
 	for i in range(5):
 		await physics_frame
-	Input.action_press("ui_accept")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("ui_accept")
+	Input.action_release("fire")
 	await process_frame
 
 	var save_path := "user://saves/slot_1.save"

@@ -30,9 +30,9 @@ func _initialize() -> void:
 		await physics_frame
 
 	# 기본 장비(도끼 등급 1)로는 등급 2 나무를 채집할 수 없어야 한다.
-	Input.action_press("ui_accept")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("ui_accept")
+	Input.action_release("fire")
 	await process_frame
 
 	if tree2.hits_taken != 0:
@@ -42,18 +42,18 @@ func _initialize() -> void:
 	# 등급 2 도끼로 교체하면 상호작용이 진행되어야 한다.
 	player.equip("tool", "도끼", 2)
 
-	Input.action_press("ui_accept")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("ui_accept")
+	Input.action_release("fire")
 	await process_frame
 
 	if not is_instance_valid(tree2) or not tree2.is_inside_tree():
 		push_error("FAIL: 등급 2 나무가 1회 채집으로 사라짐 (grade가 난이도에 반영되지 않음)")
 		ok = false
 
-	Input.action_press("ui_accept")
+	Input.action_press("fire")
 	await process_frame
-	Input.action_release("ui_accept")
+	Input.action_release("fire")
 	await process_frame
 
 	if is_instance_valid(tree2) and tree2.is_inside_tree():

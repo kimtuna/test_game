@@ -1,9 +1,14 @@
 extends Area2D
 
 # 채집 가능한 나무. Player가 상호작용 범위(Area2D)에 들어온 상태에서
-# ui_accept(기본: Space/Enter — 커스텀 입력맵 없이 Godot 기본 액션을 그대로
-# 사용해 project.godot의 InputEventKey 리소스를 직접 편집하는 위험을 피함)를
-# 누르면 나무가 사라지고 자원을 얻는다.
+# 좌클릭(fire 액션)을 누르면 나무가 사라지고 자원을 얻는다.
+#
+# inbox.md #7 2번: 이전까지는 ui_accept(Space/Enter)로 채집했는데, 동물
+# 사냥이 이미 fire(좌클릭)로 통일돼 있어(inbox #4/#5) 대상마다 트리거 키가
+# 다른 상태였다. 도구/무기를 모두 장비로 드는 구조이니 상호작용을 전부
+# 좌클릭으로 통일한다 — 다만 나무/식물/물고기는 근접 도구(도끼/낫/낚싯대)라
+# 총처럼 긴 사거리일 필요는 없으므로, 트리거 키만 fire로 바꾸고 판정은 기존
+# 근접(player_nearby, Area2D) 방식을 그대로 유지한다.
 #
 # design.md의 "등급·장비" 단계 첫 조각으로 등급(grade, 1~3)을 추가했다.
 # 높은 등급일수록 채집이 어렵다는 design.md 요구를 가장 단순하게 만족시키기
@@ -55,7 +60,7 @@ func _on_body_exited(body: Node2D) -> void:
 		player_nearby = null
 
 func _process(_delta: float) -> void:
-	if player_nearby != null and Input.is_action_just_pressed("ui_accept"):
+	if player_nearby != null and Input.is_action_just_pressed("fire"):
 		_register_hit()
 
 func _register_hit() -> void:

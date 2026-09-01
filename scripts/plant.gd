@@ -43,8 +43,10 @@ func _on_body_exited(body: Node2D) -> void:
 	if body == player_nearby:
 		player_nearby = null
 
+# inbox.md #7 2번: 상호작용을 전부 좌클릭(fire)으로 통일했다 — 근거는
+# tree.gd 주석 참고. 근접(player_nearby) 판정은 그대로다.
 func _process(_delta: float) -> void:
-	if player_nearby != null and Input.is_action_just_pressed("ui_accept"):
+	if player_nearby != null and Input.is_action_just_pressed("fire"):
 		_register_hit()
 
 func _register_hit() -> void:

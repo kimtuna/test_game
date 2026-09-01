@@ -26,9 +26,9 @@ func _initialize() -> void:
 	for i in range(5):
 		await physics_frame
 	for i in range(tree2.grade):
-		Input.action_press("ui_accept")
+		Input.action_press("fire")
 		await process_frame
-		Input.action_release("ui_accept")
+		Input.action_release("fire")
 		await process_frame
 
 	if is_instance_valid(tree2) and tree2.is_inside_tree():
@@ -45,9 +45,9 @@ func _initialize() -> void:
 	for i in range(5):
 		await physics_frame
 	for i in range(fish2.grade):
-		Input.action_press("ui_accept")
+		Input.action_press("fire")
 		await process_frame
-		Input.action_release("ui_accept")
+		Input.action_release("fire")
 		await process_frame
 
 	if is_instance_valid(fish2) and fish2.is_inside_tree():
@@ -64,9 +64,9 @@ func _initialize() -> void:
 	for i in range(5):
 		await physics_frame
 	for i in range(plant2.grade):
-		Input.action_press("ui_accept")
+		Input.action_press("fire")
 		await process_frame
-		Input.action_release("ui_accept")
+		Input.action_release("fire")
 		await process_frame
 
 	if is_instance_valid(plant2) and plant2.is_inside_tree():
@@ -78,7 +78,8 @@ func _initialize() -> void:
 
 	# --- 등급 2 동물: 사냥하면 고기 x2가 나와야 한다 ---
 	# inbox.md #4 2번(status.md #49)로 동물 공격 입력이 ui_accept에서
-	# fire(+ammo_type="normal")로 바뀌었다. 7회 발사가 필요해 기본 탄창(6발)을
+	# fire(+ammo_type="normal")로 바뀌었다(나무/식물/물고기도 inbox #7 2번으로
+	# 같은 fire를 쓴다). 7회 발사가 필요해 기본 탄창(6발)을
 	# 넘으므로, 탄약 소모가 아니라 보상 수량을 검증하는 이 테스트에서는
 	# 넉넉히 채워둔다.
 	var animal2: Area2D = main.get_node("Animal2")

@@ -9,7 +9,7 @@ extends Area2D
 #
 # 실제 수영/낚싯줄 캐스팅 등 물 위에서의 이동은 design.md "범위 밖"(섬
 # 크기·지형 생성 방식 미정)이라, 이번 조각은 물고기를 섬 위 걸어서 도달 가능한
-# 위치(예: 해안가)에 배치하고 나무와 동일한 방식(근접 + ui_accept)으로
+# 위치(예: 해안가)에 배치하고 나무와 동일한 방식(근접 + 좌클릭)으로
 # 상호작용하는 최소 구현으로 범위를 좁혔다. 실제 물 위 낚시 메커닉은 이후
 # 세션이 지형/이동 체계를 더 구체화한 뒤에 다룰 문제다.
 #
@@ -41,8 +41,10 @@ func _on_body_exited(body: Node2D) -> void:
 	if body == player_nearby:
 		player_nearby = null
 
+# inbox.md #7 2번: 상호작용을 전부 좌클릭(fire)으로 통일했다 — 근거는
+# tree.gd 주석 참고. 근접(player_nearby) 판정은 그대로다.
 func _process(_delta: float) -> void:
-	if player_nearby != null and Input.is_action_just_pressed("ui_accept"):
+	if player_nearby != null and Input.is_action_just_pressed("fire"):
 		_register_hit()
 
 func _register_hit() -> void:
