@@ -201,3 +201,18 @@
 - 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음). 이번 변경과 직접 관련된 테스트 5종만 재실행(규칙 4 QA 지침 — 전체를 다 돌리지 않음): `mainmenu_headless_test`(`PASS`, 신규), `save_load_headless_test`(`PASS`, 신규), `slot_headless_test`(`PASS`), `customization_headless_test`(`PASS`), `tutorial_headless_test`(`PASS`) 모두 통과. `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(에디터 프로세스 2개는 세션 시작 전부터 사용자가 띄워둔 것). 에러 없이 진행됨.
 - 남은 제약: 설정 메뉴는 전체화면 토글 하나뿐이다(볼륨 등은 design.md가 사운드를 후순위로 미뤄 범위 밖). 게임 플레이 중 메인 메뉴로 돌아가는 기능(예: ESC)은 이번에 추가하지 않았다 — inbox.md #4 4번이 "실행 시 진입" 흐름만 명시했고, 범위를 넓히면 규칙 4를 넘어선다고 판단했다. 저장은 채집/포획/강화 시점에만 이뤄지고 이동 위치 등은 저장하지 않는다(재접속 시 항상 `PLAYER_SPAWN_POSITION`에서 시작) — design.md가 세부를 명시하지 않았고, 위치 저장까지 다루면 새 결정(스폰 로직과의 상호작용)이 늘어나 범위를 넘어선다고 판단했다. `inbox.md` #4의 5번(제작/줍기/인벤토리 정리 제외)은 애초에 "하지 말 것" 지시라 그대로 미착수 상태를 유지했다.
 - 다음 할 일: `inbox.md` #4(WASD 이동/마우스 사냥/채집 유지/메인메뉴+저장/제외 항목)의 5개 항목이 모두 반영됐다(1~4번 구현, 5번은 "하지 말 것" 지시라 미착수 자체가 이행). 다음 세션은 `inbox.md`에 새 지시가 없다면, 사람이 직접 플레이해 메인 메뉴~슬롯~커스터마이징~튜토리얼~게임플레이 전체 흐름이 자연스러운지 시각적으로 확인하거나(여러 세션째 미뤄지고 있음), design.md 로드맵 중 아직 다루지 않은 세부(포획한 동물의 실제 활용, 게임 중 메인 메뉴로 나가는 흐름)를 규칙 4에 따라 하나 골라 진행할 것을 권장한다.
+
+---
+
+### #51 — 2026-09-02 02:21 (수동 실행, 사용자가 하네스 사이클 1회를 직접 요청)
+
+- 계기: `inbox.md`에 미처리 항목이 없어(#4까지 모두 처리 완료), `status.md` #50이 다음 후보로 남긴 두 가지(포획한 동물의 실제 활용 / 게임 중 메인 메뉴로 나가는 흐름) 중 규칙 4(기능 하나만)에 맞게 더 작고 확실한 "게임 중 메인 메뉴로 나가는 흐름"을 골랐다.
+- 한 일:
+  - `scripts/pause_overlay.gd` 신설 + `scenes/Main.tscn`의 `UI` 아래 `PauseOverlay`(배경 반투명 패널 + "이어하기 (ESC)"/"메인 메뉴로" 버튼) 추가. ESC를 누르면 `scripts/main.gd`의 `_unhandled_input`이(다른 오버레이가 떠 있지 않을 때만) `pause_overlay.visible = true`와 `get_tree().paused = true`를 설정해 실제 게임플레이(Player/Animal 등 물리 처리)를 멈춘다.
+  - 핵심 판단: `PauseOverlay` 노드 자신만 `process_mode = ALWAYS`로 설정했다. Main(루트) 전체를 ALWAYS로 바꾸면 process_mode 상속 규칙상 자식(Player/Animal/Tree 등, Main의 자식이자 UI의 형제)까지 함께 "항상 처리"로 바뀌어 애초에 멈추지 않게 되므로, 오버레이 노드만 예외로 두는 편이 Godot 4의 표준 일시정지 메뉴 패턴과도 일치한다고 판단했다. 이 덕분에 paused 상태에서도 오버레이의 버튼 클릭과 ESC 재입력(재개)은 `pause_overlay.gd` 자신의 `_unhandled_input`을 통해 정상 동작한다.
+  - "메인 메뉴로" 버튼은 `get_tree().paused = false`를 먼저 호출한 뒤 `MainMenu.tscn`으로 전환한다 — `SceneTree.paused`는 씬 전환과 무관하게 유지되는 전역 상태라, 풀지 않고 전환하면 새로 뜬 메인 메뉴가 계속 멈춘 채로 남아 버튼조차 눌리지 않는 문제를 미리 막았다.
+  - `TutorialOverlay`의 조작 안내 문구에 "ESC: 일시정지(메인 메뉴로 나가기)" 한 줄을 추가해, 새로 생긴 조작을 사용자가 튜토리얼에서 바로 알 수 있게 했다(status.md #50이 이미 조작 변경 시 이 문구를 함께 갱신해온 패턴을 따름).
+  - 신규 헤드리스 테스트 `tests/pause_menu_headless_test.gd` 추가: 슬롯 선택→커스터마이징→튜토리얼을 지나 실제 플레이 상태에 도달한 뒤 (1) ESC로 열림 + `SceneTree.paused == true`, (2) paused 상태에서 ESC로 재개(`pause_overlay.gd` 자신의 process_mode=ALWAYS 경로 검증), (3) "메인 메뉴로" 버튼 클릭(시그널 직접 발생) 후 `paused == false` 및 `MainMenu` 씬 전환을 확인한다.
+- 확인: `godot --headless --path . --quit` 에러 없음. 이번 변경과 직접 관련된 테스트만 재실행(규칙 4 QA 지침): `pause_menu_headless_test`(`PASS`, 신규), `mainmenu_headless_test`(`PASS`), `tutorial_headless_test`(`PASS`), `slot_headless_test`(`PASS`), `customization_headless_test`(`PASS`), `save_load_headless_test`(`PASS`) 모두 통과 — Main.tscn/main.gd의 `_unhandled_input`에 새 분기를 추가한 변경이라 기존 오버레이(슬롯/커스터마이징/튜토리얼) 흐름과 저장/불러오기가 깨지지 않았는지 함께 확인했다. `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(에디터 프로세스 2개는 세션 시작 전부터 사용자가 띄워둔 것). 에러 없이 진행됨.
+- 남은 제약: 저장은 여전히 채집/포획/강화 시점에만 이뤄진다 — "메인 메뉴로" 버튼을 눌러 나가는 시점에는 명시적으로 저장하지 않는다(design.md가 세부를 정하지 않았고, 마지막 채집/포획/강화 이후의 순수 이동만 사라지는 정도라 status.md #50이 이미 남긴 제약과 동일선상이라고 판단했다. 나가기 시점 저장을 새로 추가하면 저장 트리거 시점을 늘리는 별개의 결정이 되어 규칙 4를 넘어선다). Tab(슬롯 전환) 오버레이가 떠 있는 동안에는 ESC로 일시정지 메뉴를 열 수 없게 막아뒀다(의도된 것 — 슬롯 선택 중 이탈 경로가 두 개로 겹치는 것을 방지).
+- 다음 할 일: `inbox.md`에 새 지시가 없다면, `status.md` #50이 남긴 나머지 후보인 "포획한 동물의 실제 활용"을 규칙 4에 따라 다음 조각으로 진행하거나, 사람이 직접 플레이해 지금까지 쌓인 메뉴/저장/일시정지 흐름 전체를 시각적으로 확인할 것을 권장한다.
