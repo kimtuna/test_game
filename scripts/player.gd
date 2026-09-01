@@ -47,7 +47,16 @@ func _apply_body_color(color: Color) -> void:
 func set_body_color(color: Color) -> void:
 	_apply_body_color(color)
 
+# status.md #33까지는 여러 Player 인스턴스가 한 화면(호스트)에 존재하면
+# 로컬 키보드 입력이 전부를 동시에 움직였다 — main.gd가 스폰 시
+# set_multiplayer_authority(id)로 각 인스턴스의 소유 피어를 지정해두었으므로,
+# 그 소유자(authority)가 아닌 피어에서는 입력을 무시해 자기 자신의 Player만
+# 움직이게 한다. 오프라인(멀티플레이 피어 미설정) 상태에서는 authority
+# 기본값(1)과 unique_id 기본값(1)이 항상 같아 기존 싱글플레이 동작에는
+# 영향이 없다.
 func _physics_process(_delta: float) -> void:
+	if not is_multiplayer_authority():
+		return
 	var direction := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	velocity = direction * SPEED
 	move_and_slide()

@@ -72,6 +72,8 @@ const SLOT_KEYS: Dictionary = {
 const PLAYER_SCENE: PackedScene = preload("res://scenes/Player.tscn")
 const PLAYER_SPAWN_POSITION := Vector2(576, 324)
 
+@onready var player_spawner: MultiplayerSpawner = $PlayerSpawner
+
 var slot_colors: Dictionary = {}
 var current_slot: int = 0
 # pending_tutorial: 이번 세션에서 튜토리얼을 아직 한 번도 보여주지 않았는가.
@@ -80,6 +82,7 @@ var current_slot: int = 0
 var pending_tutorial: bool = true
 
 func _ready() -> void:
+	player_spawner.spawn_function = _create_player_instance
 	var network_manager := get_node("/root/NetworkManager")
 	network_manager.peer_connected_to_me.connect(_on_peer_connected)
 	network_manager.peer_disconnected_from_me.connect(_on_peer_disconnected)
@@ -102,10 +105,22 @@ func _spawn_player(id: int) -> void:
 	var node_name := _player_node_name(id)
 	if has_node(node_name):
 		return
+	player_spawner.spawn(id)
+
+# MultiplayerSpawner.spawn_function으로 등록되어, spawn(id) 호출 시 서버뿐
+# 아니라 그 스폰을 전달받는 모든 피어에서 동일하게 실행된다(단순 add_child
+# 감지 방식과 달리, 커스텀 spawn_function은 모든 피어가 같은 인자로 재실행하는
+# 방식이라 이 안에서 정한 상태가 각 피어에 동일하게 반영된다). 여기서
+# multiplayer_authority를 id로 지정해야, 이후 player.gd의
+# is_multiplayer_authority() 체크가 모든 피어에서 "이 Player는 id 피어가
+# 조작한다"는 동일한 결론에 도달한다 — set_multiplayer_authority를 서버에서만
+# 호출하면 그 값은 로컬에만 적용되고 다른 피어에는 전달되지 않기 때문이다.
+func _create_player_instance(id: int) -> Node:
 	var player := PLAYER_SCENE.instantiate()
-	player.name = node_name
+	player.name = _player_node_name(id)
 	player.position = PLAYER_SPAWN_POSITION
-	add_child(player)
+	player.set_multiplayer_authority(id)
+	return player
 
 func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():
