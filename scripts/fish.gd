@@ -12,6 +12,9 @@ extends Area2D
 # 위치(예: 해안가)에 배치하고 나무와 동일한 방식(근접 + ui_accept)으로
 # 상호작용하는 최소 구현으로 범위를 좁혔다. 실제 물 위 낚시 메커닉은 이후
 # 세션이 지형/이동 체계를 더 구체화한 뒤에 다룰 문제다.
+#
+# tree.gd와 동일하게, 낚시 보상 수량도 grade와 같은 값으로 맞췄다(등급별 보상
+# 차등). 자세한 근거는 tree.gd 주석 참고.
 
 signal harvested(resource_name: String, amount: int)
 
@@ -56,8 +59,8 @@ func _register_hit() -> void:
 		print("물고기를 낚는 중... (%d/%d)" % [hits_taken, grade])
 
 func _harvest() -> void:
-	print("물고기를 낚았다: 물고기 x1")
-	harvested.emit("물고기", 1)
+	print("물고기를 낚았다: 물고기 x%d" % grade)
+	harvested.emit("물고기", grade)
 	queue_free()
 
 func _create_fish_texture() -> ImageTexture:

@@ -14,6 +14,9 @@ extends Area2D
 # 종류별로 별도 슬롯을 쓰는 이유(도끼/마취총/낚싯대와 동일)도 그대로다 —
 # 대상별로 "장비를 맞춰 나간다"는 문장이 의미를 가지려면 자원별로 구분된
 # 장비가 있어야 한다.
+#
+# tree.gd/fish.gd와 동일하게, 채집 보상 수량도 grade와 같은 값으로 맞췄다
+# (등급별 보상 차등). 자세한 근거는 tree.gd 주석 참고.
 
 signal harvested(resource_name: String, amount: int)
 
@@ -58,8 +61,8 @@ func _register_hit() -> void:
 		print("식물을 채집 중... (%d/%d)" % [hits_taken, grade])
 
 func _harvest() -> void:
-	print("식물을 채집했다: 채소 x1")
-	harvested.emit("채소", 1)
+	print("식물을 채집했다: 채소 x%d" % grade)
+	harvested.emit("채소", grade)
 	queue_free()
 
 func _create_plant_texture() -> ImageTexture:

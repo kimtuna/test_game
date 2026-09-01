@@ -57,6 +57,11 @@ extends Area2D
 # 동물의 grade보다 낮으면 각각 공격/포획이 진행되지 않는다. tree.gd와 동일한
 # 판단(장비가 있는 것만으로는 부족하고, 대상의 등급 이상인 장비를 갖춰야
 # 상호작용이 통한다)을 여기에도 그대로 적용했다.
+#
+# tree.gd/fish.gd/plant.gd와 동일하게, 사냥 보상(고기) 수량도 grade와 같은
+# 값으로 맞췄다(등급별 보상 차등). 포획(capture)은 동물을 자원으로 소비하는
+# 것이 아니라 개체를 그대로 소유하게 되는 별개 경로라 보상 수량 개념이 없고,
+# 이번 변경 대상이 아니다.
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -161,8 +166,8 @@ func _attack() -> void:
 	health -= ATTACK_DAMAGE
 	print("동물을 공격했다. 남은 체력: %d" % health)
 	if health <= 0:
-		print("동물을 사냥했다: 고기 x1")
-		harvested.emit("고기", 1)
+		print("동물을 사냥했다: 고기 x%d" % grade)
+		harvested.emit("고기", grade)
 		queue_free()
 		return
 	_update_health_label()

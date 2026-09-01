@@ -22,6 +22,12 @@ extends Area2D
 # design.md 문장이 지금까지는 "장비가 있으면 등급과 무관하게 항상 통한다"는
 # 상태였는데, 이제는 더 높은 등급을 상대하려면 실제로 더 높은 등급의 장비로
 # 교체해야 하는 의미가 생긴다.
+#
+# status.md #41/#42가 "남은 제약"으로 남긴 대로, 지금까지는 등급이 높을수록
+# 채집이 어려워지기만 할 뿐 보상은 항상 x1로 고정돼 "더 어려운 대상을 상대할
+# 유인"이 부족했다. 별도 보상 테이블 없이 가장 단순하게, 채집 시 보상 수량을
+# hits_required와 동일한 grade 값으로 맞췄다 — "몇 번 더 상호작용해야 하는가"로
+# 난이도를 표현한 기존 방식과 같은 축을 그대로 재사용해 새 개념을 늘리지 않았다.
 
 signal harvested(resource_name: String, amount: int)
 
@@ -66,8 +72,8 @@ func _register_hit() -> void:
 		print("나무를 채집 중... (%d/%d)" % [hits_taken, grade])
 
 func _harvest() -> void:
-	print("나무를 채집했다: 통나무 x1")
-	harvested.emit("통나무", 1)
+	print("나무를 채집했다: 통나무 x%d" % grade)
+	harvested.emit("통나무", grade)
 	queue_free()
 
 func _create_tree_texture() -> ImageTexture:
