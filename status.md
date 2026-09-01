@@ -224,3 +224,24 @@
   - `godot --headless --path . --quit` 에러 없음(GDScript 변경 없음, 규칙 4의 기본 체크로 수행). `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(세션 시작 전부터 열려있던 에디터 인스턴스 1개는 무관).
 - 남은 제약: `animate()`는 여전히 mock으로만 검증됐다 — 실제 PixelLab 응답 구조가 문서와 다르면(특히 `last_response.images`의 정확한 필드명) 첫 라이브 호출에서 소폭 수정이 필요할 수 있다. `inbox.md` #9 2번(사슴 정적 이미지 실제 생성)이 여전히 전제 조건으로 남아있다 — 애니메이션 도구가 준비돼 있어도 크레딧이 없으면 아무 것도 실행할 수 없다. status.md #57/#58/#61/#66이 남긴 기존 미해결 사항(아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스, 머리 종류 색상 선택 부재, 원격 피어 애니메이션 미동기화)도 그대로 남아있다.
 - 다음 할 일: **계정 크레딧/플랜이 회복된 뒤** 다음 세션은 `inbox.md` #9의 2번(사슴 정적 이미지 생성 — `python3 tools/pixellab_gen.py --description "..." --width 32 --height 40 --grid`)부터 이어받는다. 정적 이미지가 선택되면 이번 세션이 추가한 애니메이션 모드(`python3 tools/pixellab_gen.py --reference <선택된 파일> --action "walk" --width 32 --height 40 --strip`)로 3번을 바로 이어갈 수 있다. 만약 다음 세션 시작 시에도 여전히 크레딧이 부족하면, 다시 402를 재현하려 시도하지 말고(계정 상태는 `GET /balance` 한 번으로 충분히 확인 가능, 결과가 바뀌지 않는 한 재시도는 낭비) 그 사실만 기록하고, 이번 세션처럼 크레딧 없이도 준비할 수 있는 다른 조각(예: Godot 쪽 `scripts/animal.gd`/`scenes/Animal.tscn`에 실제 텍스처를 나중에 꽂을 수 있도록 로딩 경로를 미리 정리해두는 것 등)이 남아있는지 판단한다.
+
+---
+
+### #69 — 2026-09-02 04:57 (PixelLab로 사슴 정적 스프라이트 생성/선정, inbox #9 2번 처리)
+
+요약: `inbox.md` #10이 크레딧 문제가 해결됐다고 확인해줘서(Tier 1 업그레이드, 2000/2000 generations) `inbox.md` #9의 2번(사슴 정적 이미지 생성)을 처리했다. `tools/pixellab_gen.py`로 실제 라이브 API를 처음 호출해 64장을 생성했고, 비교 그리드와 개별 확대 비교를 Read 도구로 직접 보고 `#06`을 채택해 `assets/sprites/animal/deer_base.png`로 저장했다. 라이브 호출이 이번이 처음이라 `last_response.images` 필드 구조가 문서와 실제로 일치하는지도 함께 검증됐다 — 코드 수정 없이 정상 동작했다.
+
+- 계기: `inbox.md` #9는 2~5번이 미착수(부분 처리) 상태였고, `inbox.md` #10이 "다음 세션은 inbox #9의 2~5번(사슴 생성부터)을 바로 이어서 진행하면 된다"고 명시해 가장 오래된 미처리 조각인 2번부터 이어받는 것이 맞다고 판단했다. #10 자체(해상도 설정 UI)는 새로 추가된 항목이라 순서상 이번 세션 범위가 아니다.
+- 한 일:
+  - 세션 시작 시 `GET /balance`로 크레딧 상태를 먼저 재확인 — `subscription.status: "active"`, `generations: 2000.0/2000.0`(Tier 1). `#67`/`#68`이 겪은 402 차단이 해결된 것을 확인하고 진행했다.
+  - `assets/ART_STYLE.md`를 다시 읽고 동물 카테고리 권장 캔버스(32~48 × 24~40)와 기존 `animal.gd`의 절차적 사각형 크기(40×32)를 그대로 기준으로 삼아 `--width 40 --height 32`로 정했다(64장 최저 단가 구간, 42 이하).
+  - 프롬프트: `"a small brown deer standing, pure top-down view, pixel art, flat colors, hard-edge shading, no outline"` — ART_STYLE.md의 정통 탑다운 시점, 외곽선 없음, 하드 엣지 음영 규칙을 프롬프트에 직접 반영했다.
+  - `python3 tools/pixellab_gen.py --description "..." --width 40 --height 32 --grid --grid-limit 25`로 64장 생성 + 25장 비교 그리드(`comparison.png`) 생성 성공(`tools/pixellab_gen.py`가 mock으로만 검증됐던 `submit_job()`/`poll_job()`/`generate()` 경로가 실제 API에서도 코드 수정 없이 그대로 동작함을 확인 — `#67`이 남긴 "images 필드명이 다르면 수정 필요" 우려가 기우였음).
+  - `comparison.png`를 Read 도구로 열어 25장을 훑어봤다. 뿔(antler) 대칭성, 실루엣 선명도, 얼룩무늬(fawn spot) 노이즈 유무를 기준으로 `#06`/`#07`/`#11`/`#20` 네 후보를 추렸고, 이 네 장만 8배 확대해 나란히 붙인 별도 비교 이미지를 만들어 다시 Read로 확인했다. `#06`을 최종 채택 — 뿔이 좌우 대칭이고, 몸통 상단(어깨)이 밝고 다리 쪽으로 갈수록 어두워지는 음영이 ART_STYLE.md의 "좌상단 45도 광원" 규칙과 가장 잘 맞았으며, 다른 후보들(#14/#15/#21/#22 등)에 섞여있던 흰 반점(아기사슴 무늬) 노이즈가 없어 성체 사슴 실루엣이 더 깔끔했다.
+  - 채택한 `a_small_brown_deer_standing__pure_top_do_06.png`을 `assets/sprites/animal/deer_base.png`로 복사해 저장(`ART_STYLE.md` 파일 구성 규칙: `assets/sprites/<category>/<name>.png`). 나머지 63장 후보와 비교 그리드는 `tools/pixellab_candidates/`에 남아있고 `.gitignore`(status.md #67에서 추가)로 이미 커밋 제외 대상이다.
+- 확인:
+  - `python3 -c "from PIL import Image; ..."`로 저장된 PNG가 40×32 RGBA인지 확인.
+  - `godot --headless --path . --quit` 에러 없음(GDScript 변경 없음 — 이번 세션은 에셋 파일 추가만 했으므로 규칙 4의 기본 quit 체크로 충분하다고 판단).
+  - `git status`로 의도한 파일(`assets/sprites/animal/deer_base.png`) 하나만 스테이징됐는지 확인 후 커밋.
+- 남은 제약: `assets/sprites/animal/deer_base.png`는 아직 `scripts/animal.gd`/`scenes/Animal.tscn`에 반영되지 않았다 — `_create_animal_texture()`가 여전히 40×32 단색 사각형을 절차적으로 그린다(`inbox.md` #9 4번 범위, 이번 세션에서 의도적으로 건드리지 않음). 걷기 애니메이션(#9 3번)도 아직 생성 전이다. `inbox.md` #10(해상도 설정 UI)은 여전히 미처리로 남아있다. status.md #57/#58/#61/#66이 남긴 기존 미해결 사항(아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스, 머리 종류 색상 선택 부재, 원격 피어 애니메이션 미동기화)도 그대로 남아있다.
+- 다음 할 일: `inbox.md` #9의 3번(이번에 채택한 `deer_base.png`를 참조 이미지로 `python3 tools/pixellab_gen.py --reference assets/sprites/animal/deer_base.png --action "walk" --width 40 --height 32 --strip`으로 걷기 애니메이션 생성 → Read로 스트립 확인)을 이어받거나, #9의 우선순위가 #10보다 앞서므로 순서상 3번이 다음이다. #9가 모두 끝난 뒤 #10(해상도 설정 UI, project.godot 정적 설정 대신 런타임 코드로 창 크기 지정)을 처리한다. `inbox.md`에 아직 미처리 항목(#9 3~5번, #10)이 남아있으므로 규칙 7의 `HARNESS_STOP` 조건에 해당하지 않는다 — 이번 세션은 멈추지 않고 정상 종료한다.
