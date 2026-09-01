@@ -204,3 +204,23 @@
 
 - 남은 제약: `tools/pixellab_gen.py`는 목 테스트로만 검증됐고 실제 PixelLab 서버 응답(특히 `last_response.images`의 정확한 필드명/구조)으로 아직 확인되지 않았다 — 계정 크레딧이 회복된 뒤 첫 실제 호출에서 `images` 필드가 문서와 다르면 코드를 소폭 수정해야 할 수 있다. 애니메이션 엔드포인트(`/animate-with-text` 등)는 이번 세션에서 전혀 조사하지 않았다(inbox #9 3번 범위). status.md #57/#58/#61/#66이 남긴 기존 미해결 사항(아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스, 머리 종류 색상 선택 부재, 원격 피어 애니메이션 미동기화)도 그대로 남아있다.
 - 다음 할 일: **계정 크레딧/플랜이 회복된 뒤** 다음 세션은 `inbox.md` #9의 2번(동물 첫 대상 — 사슴 스프라이트 생성, `assets/ART_STYLE.md` 규칙에 최대한 맞춰 프롬프트 작성, 후보 생성→비교 그리드→Read로 시각 선택→근거를 status.md에 기록)을 이어받는다. 이번 세션이 만든 `tools/pixellab_gen.py`를 그대로 쓰면 된다(`python3 tools/pixellab_gen.py --description "..." --width 32 --height 40 --grid` 형태 — 동물 캔버스는 `ART_STYLE.md` 권장 32~48×24~40 범위에서 고를 것). 만약 다음 세션 시작 시에도 여전히 크레딧이 부족하면(`GET /balance`로 먼저 확인 권장), 실제 생성을 진행하지 못한다는 사실을 status.md에 남기고 규칙 7의 "미처리 항목 없음"에는 해당하지 않으므로 `HARNESS_STOP`을 남기지 않은 채 다른 처리 가능한 조각이 있는지 판단하거나, 정말 아무것도 진행할 수 없으면 그 사실만 기록하고 정상 종료한다. `inbox.md` #9는 아직 부분 처리 상태(2~5번 미착수)이므로 규칙 7의 `HARNESS_STOP` 조건에 해당하지 않는다 — 이번 세션은 멈추지 않고 정상 종료한다.
+
+---
+
+### #68 — 2026-09-02 04:47 (PixelLab 애니메이션(animate-with-text-v2) 생성 지원 추가, inbox #9 3번 사전 준비)
+
+요약: `#67`이 남긴 지시대로 세션 시작 시 `GET /balance`를 먼저 재확인했는데 여전히 트라이얼 잔여 19/40으로 불변 — 이전 세션이 확인한 402 차단이 그대로였다. `inbox.md` #9 2번(사슴 정적 이미지 실제 생성)은 이번에도 진행 불가능하지만, "다른 처리 가능한 조각이 있는지 판단"(#67의 다음 할 일 지시)에 따라 3번(애니메이션 생성)에 필요한 도구를 크레딧 없이 먼저 준비했다 — `openapi.json`에서 `/animate-with-text-v2`의 요청/응답 스키마를 조사해 `tools/pixellab_gen.py`에 `animate()`를 추가하고 mock으로 동작을 검증했다.
+
+- 계기: `inbox.md` #1~#8은 모두 처리 완료, #9는 1번만 처리 완료(status.md #67)이고 2~5번이 미착수라 규칙 7의 "미처리 항목 없음"에 해당하지 않는다 — 세션이 멈추지 않고 이어받아야 하는 지점이었다. 다만 2번(사슴 생성)은 라이브 API 호출이 필수라 크레딧 없이는 시작할 수 없어, 그 전제 확인부터 했다.
+- 한 일:
+  - `python3`로 `GET /balance`를 다시 호출해 확인 — `{"credits": {"usd": 0.0}, "subscription": {"generations": 19.0, "total": 40.0, "status": "trial"}}`. `#67`이 확인한 상태(19/40, 가장 저렴한 티어도 20 크레딧 필요)와 완전히 동일해 여전히 402로 막힌다고 판단했다. 실제로 이미지를 요청해보는 것(다시 402를 받는 것)은 결과가 뻔하고 계정에 아무 이득이 없어 재시도하지 않았다.
+  - `curl`/`python3`로 `https://api.pixellab.ai/v2/openapi.json`을 다시 조회해 `/animate-with-text-v2`(및 v3, 구버전 `/animate-with-text`)의 요청 스키마를 비교했다. v2가 `reference_image`(base64) + `reference_image_size` + `action` + `image_size` + `view`(`"low top-down"` 등 4종) + `direction`(`south` 등 8종)을 받는 구조로, 이 게임의 탑다운 시점(design.md)·`ART_STYLE.md` 관례와 가장 잘 맞아 v2를 선택했다. 엔드포인트 설명에 "32x32/64x64 → 16프레임, 128px 이상 → 4프레임"이 명시돼 있어, 다음 세션이 사슴을 32~48px 범위로 만들면 애니메이션도 16프레임까지 받을 수 있다는 것도 확인했다.
+  - `tools/pixellab_gen.py`에 `submit_animate_job()`(POST 요청 구성 + 202 검증) / `animate()`(제출→`poll_job()` 재사용→폴링→`last_response.images`의 base64를 프레임별 PNG로 저장 + `manifest.json` 기록) 추가. 기존 `generate()`와 동일한 구조(같은 `poll_job()` 재사용, 같은 매니페스트 패턴)로 맞춰 일관성을 유지했다.
+  - CLI(`main()`)에 `--reference`/`--action`/`--view`/`--direction`/`--strip` 옵션을 추가해, `--reference`+`--action`이 주어지면 애니메이션 모드로, `--description`이 주어지면 기존 생성 모드로 분기하도록 했다(둘을 함께 쓰면 에러). `--strip`은 `tools/sprite_gen.py`의 `make_frame_strip()`(inbox #8 4번, 플레이어 걷기 애니메이션 확인 때 만든 도구)을 그대로 재사용해 프레임 순서 확인용 스트립 이미지를 만든다.
+- 확인:
+  - `python3 -m py_compile tools/pixellab_gen.py` 통과.
+  - 라이브 호출이 불가능해, `unittest.mock`으로 `requests.post`/`requests.get`을 대체해 가짜 `completed` job(4프레임, 1x1 PNG를 base64로 인코딩)을 주입하는 임시 스크립트로 `animate()`가 요청 바디(참조 이미지 base64/action/view/direction) 구성, job 폴링, 프레임 저장, `manifest.json` 기록, `make_frame_strip()` 재사용까지 정상 동작하는지 확인했다(임시 스크립트, 저장소에는 포함하지 않음 — `#67`과 동일 방식).
+  - `python3 tools/pixellab_gen.py --help`로 새 옵션들이 예상대로 노출되는지 확인.
+  - `godot --headless --path . --quit` 에러 없음(GDScript 변경 없음, 규칙 4의 기본 체크로 수행). `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(세션 시작 전부터 열려있던 에디터 인스턴스 1개는 무관).
+- 남은 제약: `animate()`는 여전히 mock으로만 검증됐다 — 실제 PixelLab 응답 구조가 문서와 다르면(특히 `last_response.images`의 정확한 필드명) 첫 라이브 호출에서 소폭 수정이 필요할 수 있다. `inbox.md` #9 2번(사슴 정적 이미지 실제 생성)이 여전히 전제 조건으로 남아있다 — 애니메이션 도구가 준비돼 있어도 크레딧이 없으면 아무 것도 실행할 수 없다. status.md #57/#58/#61/#66이 남긴 기존 미해결 사항(아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스, 머리 종류 색상 선택 부재, 원격 피어 애니메이션 미동기화)도 그대로 남아있다.
+- 다음 할 일: **계정 크레딧/플랜이 회복된 뒤** 다음 세션은 `inbox.md` #9의 2번(사슴 정적 이미지 생성 — `python3 tools/pixellab_gen.py --description "..." --width 32 --height 40 --grid`)부터 이어받는다. 정적 이미지가 선택되면 이번 세션이 추가한 애니메이션 모드(`python3 tools/pixellab_gen.py --reference <선택된 파일> --action "walk" --width 32 --height 40 --strip`)로 3번을 바로 이어갈 수 있다. 만약 다음 세션 시작 시에도 여전히 크레딧이 부족하면, 다시 402를 재현하려 시도하지 말고(계정 상태는 `GET /balance` 한 번으로 충분히 확인 가능, 결과가 바뀌지 않는 한 재시도는 낭비) 그 사실만 기록하고, 이번 세션처럼 크레딧 없이도 준비할 수 있는 다른 조각(예: Godot 쪽 `scripts/animal.gd`/`scenes/Animal.tscn`에 실제 텍스처를 나중에 꽂을 수 있도록 로딩 경로를 미리 정리해두는 것 등)이 남아있는지 판단한다.
