@@ -30,7 +30,7 @@ func _initialize() -> void:
 	var score_label: Label = main.get_node("UI/ScoreLabel")
 	var clear_label: Label = main.get_node("UI/ClearLabel")
 
-	var expected_score_text := "Score: %d" % main.total_items
+	var expected_score_text := "Score: %d / %d" % [main.total_items, main.total_items]
 	if score_label.text != expected_score_text:
 		push_error("FAIL: ScoreLabel = '%s', expected '%s'" % [score_label.text, expected_score_text])
 		ok = false

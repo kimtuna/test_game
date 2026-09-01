@@ -20,4 +20,4 @@ func _on_item_collected() -> void:
 		clear_label.visible = true
 
 func _update_label() -> void:
-	score_label.text = "Score: %d" % score
+	score_label.text = "Score: %d / %d" % [score, total_items]
