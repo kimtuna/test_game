@@ -86,3 +86,12 @@
   - `scripts/item.gd`: `_on_body_entered()` 판정을 `body.is_in_group("player")`로 변경.
 - 확인: `godot --headless --path . --quit` 에러 없음. `godot --headless --path . --script res://tests/loop_headless_test.gd` 실행 결과 `HEADLESS_LOOP_TEST: PASS (score=Score: 3, clear=true)` — 변경 후에도 이동→수집→점수→클리어 전체 루프 정상 동작 확인.
 - 다음 할 일: design.md의 1차 완료 정의는 여전히 충족된 상태다. inbox.md에 새 지시가 없는 한, 다음 세션도 확장 범위(적, 타이머, 여러 레벨, 사운드 등)를 임의로 진행하지 말고 사용자의 inbox 지시를 기다리는 것이 맞다. 다만 "대기"가 곧 "할 일 없음"을 뜻하지는 않는다 — 기존 구현을 다시 읽어보며 확장 범위를 벗어나지 않는 선에서의 견고성/버그 점검은 매 세션 유효한 작업이 될 수 있다.
+
+---
+
+### #9 — 2026-09-01 (자동 세션)
+
+- 한 일 (inbox 미처리 항목 없음. status.md #8의 권고대로 확장 기능 대신 견고성 점검을 진행하다가, `scenes/Main.tscn`의 `UI/ClearLabel`이 `CanvasLayer` 안에서 anchor(0,0,0,0) + 고정 픽셀 offset(412~812, 284~364)으로만 배치되어 있는 것을 발견함. 이 방식은 뷰포트 크기(1152x648)를 기준으로 좌상단에서 고정 거리만큼 떨어진 위치라, 데스크톱 창은 기본적으로 사용자가 리사이즈할 수 있으므로(별도로 `window/size/resizable`을 껐다는 설정이 project.godot에 없음) 창 크기를 바꾸면 "Clear!" 텍스트가 화면 중앙에서 벗어나게 되는 견고성 결함이었음. `ScoreLabel`은 좌상단 고정이 의도된 배치라 문제가 없지만 `ClearLabel`은 "화면 중앙"이 의도이므로 앵커링이 잘못됨. 이는 design.md가 막은 "확장 기능"이 아니라 이미 구현된 클리어 화면의 배치 정합성 결함 수정이므로 이번 세션 범위로 진행함):
+  - `scenes/Main.tscn`: `UI/ClearLabel`의 anchor를 `(0,0,0,0)`에서 `(0.5,0.5,0.5,0.5)`(화면 중앙)로 변경하고, offset을 뷰포트 크기와 무관하게 중앙 기준 `(-200,-40)~(200,40)`으로 재계산(기존 400x80 박스 크기 유지). 이제 창 크기가 바뀌어도 "Clear!"가 항상 화면 중앙에 표시됨.
+- 확인: `godot --headless --path . --quit` 에러 없음. `godot --headless --path . --script res://tests/loop_headless_test.gd` 실행 결과 `HEADLESS_LOOP_TEST: PASS (score=Score: 3, clear=true)` — 앵커 변경 후에도 이동→수집→점수→클리어 전체 루프 정상 동작 확인.
+- 다음 할 일: design.md의 1차 완료 정의는 여전히 충족된 상태다. inbox.md에 새 지시가 없는 한, 다음 세션도 확장 범위(적, 타이머, 여러 레벨, 사운드 등)를 임의로 진행하지 말고 사용자의 inbox 지시를 기다린다. 이번 세션처럼 UI 앵커/배치, 충돌 판정, 텍스처 등 기존 구현의 견고성 결함을 다시 점검하는 것은 매 세션 유효하지만, 이제 눈에 띄는 결함은 대부분 정리된 상태이므로 다음 자동 세션은 새로운 관점(예: 실제 창 리사이즈 시나리오, 다른 화면 해상도, 반복 실행 시 상태 초기화 등)에서 점검하거나, 더 이상 발견되는 결함이 없다면 사용자에게 다음 확장 방향을 inbox.md로 지시해 줄 것을 요청하는 상태로 대기하는 것이 맞다.
