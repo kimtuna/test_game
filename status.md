@@ -222,3 +222,19 @@
 - 확인: `godot --headless --path . --quit` 에러 없음(Label2D 시행착오 이후 최종적으로 파싱/런타임 에러 없음 확인). `godot --headless --path . --script res://tests/animal_hunt_headless_test.gd` 실행 결과 `HEADLESS_ANIMAL_HUNT_TEST: PASS (hits=3)` — 체력 라벨 검증 포함. 회귀 확인을 위해 `tests/tree_harvest_headless_test.gd`(`HEADLESS_TREE_HARVEST_TEST: PASS`), `tests/boundary_headless_test.gd`(`HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)`)도 재실행해 이상 없음을 확인.
 - 남은 제약: 체력 표시는 플레이어와의 거리와 무관하게 항상 보인다(가까이 가야만 보이게 하는 조건 없음) — design.md에 그런 제약이 명시되지 않아 상식적인 기본값으로 항상 표시함. 체력바(그래픽 바) 대신 숫자(N/100) 텍스트로만 표시해 시각적으로는 소박하다. 포획 분기(체력 8% 미만 + 마취총)는 여전히 구현되지 않았다.
 - 다음 할 일: 사냥/포획 축의 다음 단위로는 design.md가 명시한 **포획**(체력 8% 미만 상태에서 마취총으로 포획)을 시작하는 것이 자연스럽다. 마취총이라는 아이템/장비 개념이 아직 전혀 없으므로, 가장 작은 단위로는 (1) 플레이어가 소지한 것으로 가정하는 최소한의 "마취총" 개념(예: 별도 입력 액션 하나, 아이템 슬롯 없이)을 도입해 체력이 8% 미만일 때 그 입력으로 포획(동물이 사라지고 "포획 성공" 로그/자원 대신 포획 상태 기록)되는 분기를 추가하는 것, 또는 (2) 도주 AI(발소리/시야/피격 감지 중 하나)의 첫 조각을 시작하는 것 중 하나다. 두 방향 모두 design.md 로드맵(채집/사냥/포획)의 핵심에 해당하므로, inbox.md에 새 지시가 없다면 다음 세션은 규칙 4(기능 하나만)에 따라 이 중 더 작게 쪼갤 수 있는 쪽을 골라 진행한다.
+
+---
+
+### #20 — 2026-09-01 11:49 (자동 세션)
+
+- 계기: inbox.md에 미처리 항목 없음. status.md #19가 남긴 두 후보(포획 분기 vs 도주 AI) 중 "포획 분기"를 선택했다 — 도주 AI는 감지(발소리/시야)와 이동(도망 경로)을 함께 설계해야 해 규칙 4(기능 하나만)를 넘어서는 반면, 포획은 이미 있는 `health` 값에 조건 분기 하나만 추가하면 되어 더 작은 단위였다.
+- 한 일:
+  - `scripts/animal.gd`: design.md의 포획 조건(체력 8% 미만 + 마취총)을 구현. 마취총이라는 아이템/장비 개념이 아직 없으므로 "이미 마취총을 들고 있다"고 가정하고, 전용 입력 액션 `capture`(C 키, `project.godot`의 `[input]` 섹션에 신규 등록)를 마취총 발사로 취급했다. `_try_capture()`가 `health < MAX_HEALTH * 0.08`이면 `captured` 시그널을 emit하고 `queue_free()`, 아니면 실패 메시지만 출력한다.
+  - `ATTACK_DAMAGE`를 34 → 31로 조정했다. 기존 34는 100→66→32→(-2, 즉사) 순서라 정수 체력이 8%(8) 미만인 1~7 구간에 절대 도달하지 못해 포획이 원천적으로 불가능한 구조였다. 31로 바꾸면 100→69→38→7이 되어 3회 공격 후 정확히 7(8% 미만)에서 멈추므로, 플레이어가 거기서 공격을 멈추고 포획으로 전환할 수 있다. 이는 design.md가 명시한 포획 조건을 실제로 도달 가능하게 만들기 위한 균형 조정이라 이번 세션 범위로 포함했다(새 기능이 아니라 기존 수치가 새 기능을 원천 차단하는 결함 수정에 가까움).
+  - `scripts/main.gd`: `capturable` 그룹의 `captured` 시그널을 구독해 포획한 동물을 `captured_animals` 딕셔너리에 누적하고 `UI/CaptureLabel`에 "포획: 동물 x1" 형식으로 표시. 포획은 소비되는 자원이 아니라 "잡아서 소유하게 된 개체"라는 점이 채집/사냥 자원과 달라 기존 `inventory`/`InventoryLabel`과 분리했다.
+  - `scenes/Main.tscn`: `UI/CaptureLabel`(Label) 추가, `InventoryLabel` 바로 아래(offset 16,110~300,194)에 배치해 겹치지 않게 함.
+  - `tests/animal_hunt_headless_test.gd`: `ATTACK_DAMAGE` 변경(34→31)에 맞춰 1회 공격 후 기대 체력 라벨을 "66/100" → "69/100"으로, 주석의 "3회 -> 사망"을 "4회 -> 사망"으로 갱신.
+  - `tests/animal_capture_headless_test.gd` 신설: (1) 체력이 100/100(8% 이상)일 때 `capture` 액션을 눌러도 포획되지 않는지, (2) `ui_accept`로 3회 공격해 체력을 7/100(8% 미만)까지 낮춘 뒤 `capture`를 누르면 실제로 동물이 사라지고 `CaptureLabel`이 "포획: 동물 x1"이 되는지, (3) 이때 죽인 것이 아니므로 `InventoryLabel`(고기)에는 아무것도 기록되지 않는지 검증.
+- 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음 — `project.godot`에 `[input]` 섹션을 직접 추가했음에도 형식 오류 없이 파싱됨). `godot --headless --path . --script res://tests/animal_capture_headless_test.gd` → `HEADLESS_ANIMAL_CAPTURE_TEST: PASS`. 회귀 확인을 위해 재실행한 `tests/animal_hunt_headless_test.gd`(`HEADLESS_ANIMAL_HUNT_TEST: PASS (hits=4)`), `tests/tree_harvest_headless_test.gd`(`HEADLESS_TREE_HARVEST_TEST: PASS`), `tests/boundary_headless_test.gd`(`HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)`) 모두 이상 없음.
+- 남은 제약: `capture` 액션은 아무 제약 없이 근접만 하면 누구나 즉시 쏠 수 있다 — 실제 마취총이라면 재장전/사거리/탄약 개념이 있어야 하지만 이는 design.md가 "범위 밖"으로 명시한 밸런스 수치라 이번 세션에서는 다루지 않았다. 포획된 동물은 `queue_free()`로 사라지고 "포획 개체 수"만 라벨에 남을 뿐, 실제로 포획한 동물을 나중에 활용(사육/전시/판매 등)하는 시스템은 아직 없다 — design.md에도 포획 이후 활용은 명시되어 있지 않아 범위 밖으로 남겨둠. 도주 AI(발소리/시야/피격 감지)는 여전히 구현되지 않아, design.md의 "동물은 죽일 수도, 포획할 수도 있다"는 이제 두 경로 모두 갖췄지만 "고정되어 도망가지 않는" 상태는 그대로다.
+- 다음 할 일: design.md 로드맵상 다음으로 자연스러운 단위는 **도주 AI**의 첫 조각이다. 세 트리거(발소리 감지/시야 감지/피격 감지) 중 가장 작게 쪼갤 수 있는 것은 "피격당했을 때 도망" — 이미 `_attack()`이 호출되는 시점이 있으므로, 여기에 이동 로직(예: 플레이어 반대 방향으로 일정 시간 이동)만 추가하면 되어 새로운 감지 시스템(시야 레이캐스트, 발소리 반경 등)을 설계하지 않아도 된다. inbox.md에 새 지시가 없다면 다음 세션은 이 방향을 규칙 4(기능 하나만)에 따라 진행하는 것을 권장한다.
