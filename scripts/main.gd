@@ -25,6 +25,16 @@ const RESOURCE_TO_SLOT: Dictionary = {
 	"채소": "sickle",
 }
 
+# inbox.md #6 3번: 인벤토리를 E키로 열고 닫는 그리드 UI. 마인크래프트/코어키퍼
+# 참고 지시대로 "가방 없이 기본 9칸"을 자원 종류(distinct key) 개수 제한으로
+# 구현했다 — 지금까지 inventory Dictionary는 종류 수 제한이 전혀 없었으므로,
+# 이미 9칸을 채운 뒤 새로운 종류의 자원을 얻으면(이미 갖고 있던 종류를 더
+# 얻는 것은 항상 허용) 그 자원은 얻지 못하고 버려진다. design.md/inbox
+# 어디에도 초과분 처리(드롭, 대체 등)가 명시되지 않았고, 아직 아이템을
+# 바닥에 버리는 시스템 자체가 없어(제작/줍기와 함께 범위 밖으로 미뤄짐,
+# inbox #4 5번) 가장 단순하고 상식적인 기본값으로 판단했다.
+const INVENTORY_CAPACITY: int = 9
+
 # inbox.md #4 4번(메인 메뉴 + 슬롯 선택 + 저장/불러오기 시스템)의 저장/불러오기
 # 조각. 지금까지 슬롯별 외형(slot_colors)은 세션(프로세스) 안에서만
 # 기억되어, "기존에 저장된 슬롯 선택 시 저장된 상태 그대로 이어서 시작"이
@@ -46,6 +56,8 @@ var captured_animals: Dictionary = {}
 @onready var customization_overlay: Control = $UI/CustomizationOverlay
 @onready var tutorial_overlay: Control = $UI/TutorialOverlay
 @onready var pause_overlay: Control = $UI/PauseOverlay
+@onready var inventory_overlay: Control = $UI/InventoryOverlay
+@onready var inventory_slot_grid: GridContainer = $UI/InventoryOverlay/InventoryPanel/SlotGrid
 
 # 색상 선택 키(1~4)와 스와치 색상을 한 곳에 묶어, 씬의 Swatch 노드 색과
 # 어긋나지 않도록 함(#15/#22에서 배운 "값 중복으로 인한 잠재 버그" 반복 방지).
@@ -237,6 +249,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	# inbox.md #6 3번: 인벤토리 오버레이는 게임을 멈추지 않는(process_mode를
+	# 건드리지 않는) 단순 토글이다 — pause_overlay처럼 SceneTree를 멈추면 여러
+	# 접속자가 있는 멀티플레이 세션에서 한 명이 인벤토리를 열 때마다 다른
+	# 플레이어까지 함께 멈추게 되므로, 그 방식은 부적절하다고 판단했다.
+	if inventory_overlay.visible:
+		if event.keycode == KEY_E:
+			inventory_overlay.visible = false
+			get_viewport().set_input_as_handled()
+		return
+
 	if pause_overlay.visible:
 		return
 
@@ -248,6 +270,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.keycode == KEY_TAB:
 		slot_overlay.visible = true
+		get_viewport().set_input_as_handled()
+		return
+
+	if event.keycode == KEY_E:
+		_update_inventory_grid()
+		inventory_overlay.visible = true
 		get_viewport().set_input_as_handled()
 
 func _maybe_show_tutorial() -> void:
@@ -317,9 +345,14 @@ func _apply_slot_data(data: Dictionary) -> void:
 	_update_equipment_label()
 
 func _on_harvested(resource_name: String, amount: int) -> void:
+	if not inventory.has(resource_name) and inventory.size() >= INVENTORY_CAPACITY:
+		print("인벤토리가 가득 찼다 (%d/%d칸). %s을(를) 얻지 못했다." % [INVENTORY_CAPACITY, INVENTORY_CAPACITY, resource_name])
+		return
 	inventory[resource_name] = inventory.get(resource_name, 0) + amount
 	_try_upgrade_equipment(resource_name)
 	_update_label()
+	if inventory_overlay.visible:
+		_update_inventory_grid()
 	_save_slot(current_slot)
 
 func _try_upgrade_equipment(resource_name: String) -> void:
@@ -354,6 +387,21 @@ func _update_label() -> void:
 	for resource_name in inventory.keys():
 		lines.append("%s: %d" % [resource_name, inventory[resource_name]])
 	inventory_label.text = "\n".join(lines)
+
+# inbox.md #6 3번: 9칸 그리드에 inventory(Dictionary, 종류->개수)의 각 항목을
+# 순서대로 채우고, 남는 칸은 빈 슬롯("-")으로 표시한다. 아이콘 리소스가 없어
+# (범위 밖, design.md "아트 스타일" 참고) 슬롯 안에는 자원 이름과 개수만
+# 텍스트로 표시한다.
+func _update_inventory_grid() -> void:
+	var keys: Array = inventory.keys()
+	var slots := inventory_slot_grid.get_children()
+	for i in range(slots.size()):
+		var label: Label = slots[i].get_node("SlotLabel")
+		if i < keys.size():
+			var resource_name: String = keys[i]
+			label.text = "%s\n%d" % [resource_name, inventory[resource_name]]
+		else:
+			label.text = "-"
 
 func _update_capture_label() -> void:
 	if captured_animals.is_empty():
