@@ -28,6 +28,18 @@ var equipment: Dictionary = {
 const SPEED := 300.0
 const DEFAULT_BODY_COLOR := Color(0.2, 0.6, 1.0)
 
+# design.md "기본 코디(의상) 제공: 별도로 맞추지 않아도 입고 시작할 수 있는
+# 기본 복장이 있다"를 지금까지는 "장비 슬롯이 처음부터 채워져 있다"로만
+# 해석했다(player.gd 상단 주석 참고) — 실제로 화면에 "옷을 입고 있다"고 보일
+# 시각 요소는 없이 몸 전체가 단색 사각형 하나였다. status.md #45가 남긴
+# 두 후보(포획 동물 활용/장비 UI화) 모두 이미 여러 세션째 낮은 실익으로
+# 보류돼 있어, 이번 세션은 design.md 원문에 더 직접적으로 대응하는 이
+# 시각적 격차를 골랐다. 몸(상의, 커스터마이징 색 적용)과 하의(고정된 기본
+# 복장 색)를 나눠 그려, 커스터마이징을 하지 않아도 "기본 복장을 입은
+# 캐릭터"로 보이게 한다. 하의 색은 아직 커스터마이징 대상이 아니다 — 여러
+# 부위 커스터마이징 UI는 새 시스템이라 규칙 4(기능 하나만)를 넘어선다.
+const OUTFIT_COLOR := Color(0.35, 0.25, 0.15)
+
 var body_color: Color = DEFAULT_BODY_COLOR
 
 @onready var sprite: Sprite2D = $Sprite2D
@@ -52,6 +64,12 @@ func _apply_body_color(color: Color) -> void:
 	body_color = color
 	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
 	image.fill(color)
+	# 하단(다리 위치)만 고정된 기본 복장 색으로 덮어 그려, 상의(커스터마이징
+	# 색)와 하의(기본 코디)가 시각적으로 구분되게 한다. customization_headless_test/
+	# slot_headless_test는 (0,0) 픽셀(상의 영역)만 검사하므로 영향받지 않는다.
+	for x in range(32):
+		for y in range(20, 32):
+			image.set_pixel(x, y, OUTFIT_COLOR)
 	sprite.texture = ImageTexture.create_from_image(image)
 
 func set_body_color(color: Color) -> void:
