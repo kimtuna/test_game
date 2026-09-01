@@ -386,3 +386,27 @@
   - 이번 변경과 직접 관련된 테스트 7개를 개별 실행(규칙 4 QA 지침 — Bash 도구가 셸 변수 치환이 들어간 for 루프 명령을 거부해 부득이 파일별로 하나씩 실행함): `tree_harvest_headless_test`(PASS), `plant_harvest_headless_test`(PASS), `fish_harvest_headless_test`(PASS), `equipment_gate_headless_test`(PASS), `grade_headless_test`(PASS), `grade_reward_headless_test`(PASS), `save_load_headless_test`(PASS) 모두 통과. `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(에디터로 이미 열려있던 기존 프로세스 2개는 세션 시작 전부터 떠 있던 것으로 무관함).
 - 남은 제약: `inbox.md` #7의 3번(캐릭터 커스터마이징을 눈/피부색/머리카락 종류로 확장)이 아직 미착수다. status.md #57/#58이 남긴 "아이템 줍기/제작", "핫바-상호작용 연결", "`animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스(status.md #54 CAUTION)"도 여전히 미해결이다.
 - 다음 할 일: 다음 세션은 `inbox.md` #7의 3번(커스터마이징을 눈/피부색/머리카락 종류로 확장, 저장/불러오기에도 슬롯별로 반영)을 이어받는다. 이 항목까지 처리되면 `inbox.md` #7이 모두 처리 완료되어, 규칙 7에 따라 다음 세션이 `HARNESS_STOP`을 남기고 멈출 조건이 된다(단, 그 전에 사용자가 새 지시를 추가하면 그것이 우선).
+
+---
+
+### #61 — 2026-09-02 04:05 (커스터마이징 피부색/눈색/머리종류 3단계 확장, inbox #7 3번 처리)
+
+요약: `inbox.md` #7의 남은 3번(커스터마이징을 눈/피부색/머리카락 종류로 확장)을 처리했다. `player.gd`의 단일 `body_color`를 `skin_color`/`eye_color`/`hair_type` 셋으로 나누고, `main.gd`의 커스터마이징 오버레이를 3단계 순차 선택으로 바꿨다. 이 항목으로 `inbox.md` #7 전체(1~3번)와 design.md 로드맵이 다시 "완료" 상태가 되어, 규칙 7에 따라 이번 세션에서 `HARNESS_STOP`을 남긴다.
+
+- 계기: `status.md` #60이 다음 세션은 `inbox.md` #7 3번을 이어받으라고 명시했다.
+- 한 일:
+  - `scripts/player.gd`: `body_color`/`DEFAULT_BODY_COLOR`를 `skin_color`/`eye_color`/`hair_type`(문자열, "short"/"mohawk"/"bald") 세 변수로 분리했다. `HAIR_STYLES`(종류->색+그릴 x범위) 상수로 머리를, `EYE_LEFT_X`/`EYE_RIGHT_X`/`EYE_ROWS`로 눈 도트를 그린다. 그리기 순서는 피부 전체 채우기 -> 머리(상단 밴드) -> 눈(좌우 도트) -> 하의(기존 OUTFIT_COLOR) — 머리/눈의 x범위를 (0,0)/(0,31) 코너 밖으로 잡아 기존 `outfit_headless_test`가 검사하던 상의/하의 코너 픽셀 구분이 그대로 유지되게 했다. `set_body_color()` 대신 `set_appearance(skin, eye, hair)`로 통합했다.
+  - `scripts/main.gd`: `BODY_COLOR_CHOICES` 대신 `SKIN_COLORS`/`EYE_COLORS`/`HAIR_TYPES` 배열과 `CUSTOMIZATION_KEYS`(1~4)를 인덱스로 대응시켜, 스와치 색과 키 매핑이 한 배열에서만 나오게 했다(예전에 겪었던 "키 Dictionary와 스와치 노드 색이 따로 하드코딩되어 어긋날 뻔한" 문제 재발 방지). `customization_step`(0=피부, 1=눈, 2=머리)을 두고 `_unhandled_input`의 `customization_overlay` 분기를 3단계 순차 처리로 바꿨다 — 각 단계 선택 즉시 플레이어에 미리보기가 반영되고, 마지막 단계(머리)까지 고르면 `slot_appearance[current_slot]`(옛 `slot_colors`를 Dictionary 구조로 확장)에 저장하고 오버레이를 닫는다. 스와치 4개(`Swatch1~4`)는 `_update_customization_overlay()`가 매 단계 색/표시 여부를 다시 칠한다(머리 단계는 선택지가 2개뿐이라 나머지는 숨김).
+  - `_save_slot`/`_apply_slot_data`: 저장 데이터의 `color` 필드를 `skin`/`eye`/`hair` 세 필드로 바꿨다.
+  - 영향받은 9개 헤드리스 테스트(`customization_headless_test`, `slot_headless_test`, `save_load_headless_test`, `outfit_headless_test`, `tutorial_headless_test`, `pause_menu_headless_test`, `inventory_headless_test`, `equipment_wearable_headless_test`, `hotbar_headless_test`)를 갱신했다 — 대부분 "슬롯 선택 -> 색 1회 선택 -> 튜토리얼 닫기"였던 부트스트랩 시퀀스를 "슬롯 선택 -> 3단계 선택 -> 튜토리얼 닫기"로 늘리고, `body_color`/`set_body_color` 참조를 `skin_color`/`set_appearance`로 바꿨다.
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음.
+  - 영향받은 9개 테스트 전부 개별 실행해 `PASS` 확인: `customization_headless_test`, `slot_headless_test`, `save_load_headless_test`, `outfit_headless_test`, `pause_menu_headless_test`, `tutorial_headless_test`, `inventory_headless_test`, `equipment_wearable_headless_test`, `hotbar_headless_test`. `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다(에디터로 이미 열려있던 기존 프로세스 2개는 세션 시작 전부터 떠 있던 것으로 무관함).
+
+> [!CAUTION]
+> 처음 `pause_menu_headless_test`/`tutorial_headless_test`/`inventory_headless_test`/`equipment_wearable_headless_test`/`hotbar_headless_test`를 돌렸을 때 FAIL이 났다 — 원인은 코드 버그가 아니라, 이 테스트들이 "슬롯 선택 후 색 1번만 누르면 커스터마이징이 끝난다"는 옛 1단계 전제로 부트스트랩 시퀀스를 짜뒀는데, 이번 세션에서 3단계로 늘어나 1번만 눌러서는 커스터마이징 오버레이가 계속 열려있었기 때문이다. 각 테스트의 부트스트랩 키 입력을 3회로 늘려 재확인했고, 전체 `PASS`로 재확인했다.
+- 남은 제약: 머리 종류는 색상 선택 없이 종류(모양+고정색)만 고르는 최소 구현이다(2D 도트 스타일 제약, design.md 범위 밖 판단). 아트 리소스가 없어 여전히 절차적 사각형 텍스처다. status.md #57/#58이 남긴 "아이템 줍기/제작", "핫바-상호작용 연결", `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스(status.md #54 CAUTION)도 여전히 미해결이다.
+- 다음 할 일: `inbox.md`의 #1~#7이 모두 처리 완료 상태다 — 현재 미처리 항목 없음. design.md 로드맵 각 단계가 최소 하나의 실질적 구현 + QA 통과 상태에 도달했다고 판단된다. 규칙 7에 따라 세션이 스스로 다음 후보를 골라 진행하지 않고 여기서 멈춘다. 다음에 참고할 후보(직접 코드로 만들지는 않음): 아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` 테스트 플레이키니스 조사, 머리 종류에 색상 선택 추가.
+
+> [!IMPORTANT]
+> HARNESS_STOP: inbox.md #1~#7 모두 처리 완료 + 미처리 항목 없음 — 자동 루프를 여기서 멈춘다.
