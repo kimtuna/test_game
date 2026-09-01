@@ -75,6 +75,7 @@ var captured_animals: Dictionary = {}
 @onready var inventory_overlay: Control = $UI/InventoryOverlay
 @onready var inventory_slot_grid: GridContainer = $UI/InventoryOverlay/InventoryPanel/Body/SlotGrid
 @onready var wearable_slot_column: VBoxContainer = $UI/InventoryOverlay/InventoryPanel/Body/WearableColumn
+@onready var hotbar_row: HBoxContainer = $UI/Hotbar
 
 # 색상 선택 키(1~4)와 스와치 색상을 한 곳에 묶어, 씬의 Swatch 노드 색과
 # 어긋나지 않도록 함(#15/#22에서 배운 "값 중복으로 인한 잠재 버그" 반복 방지).
@@ -92,6 +93,18 @@ const SLOT_KEYS: Dictionary = {
 	KEY_1: 1,
 	KEY_2: 2,
 	KEY_3: 3,
+}
+
+# inbox.md #6 5번: 휴대 장비 핫바 선택 키. SLOT_KEYS/BODY_COLOR_CHOICES와 같은
+# 숫자 키(1~5)를 쓰지만, 이 매핑은 slot_overlay/customization_overlay가 모두
+# 닫혀 있는 "실제 플레이 상태"에서만 확인한다(_unhandled_input에서 두 오버레이
+# 분기가 먼저 return하므로 겹치지 않는다).
+const HOTBAR_KEYS: Dictionary = {
+	KEY_1: 0,
+	KEY_2: 1,
+	KEY_3: 2,
+	KEY_4: 3,
+	KEY_5: 4,
 }
 
 # slot_colors: 슬롯 번호 -> 그 슬롯에서 마지막으로 고른 색. 아직 한 번도
@@ -141,6 +154,7 @@ func _ready() -> void:
 	_update_label()
 	_update_capture_label()
 	_update_equipment_label()
+	_update_hotbar_ui()
 	slot_overlay.visible = true
 
 func _player_node_name(id: int) -> String:
@@ -279,6 +293,19 @@ func _unhandled_input(event: InputEvent) -> void:
 	if pause_overlay.visible:
 		return
 
+	# inbox.md #6 5번: 숫자 1~5로 핫바 슬롯을 선택한다. 위에서 이미 slot_overlay/
+	# customization_overlay/tutorial_overlay/inventory_overlay/pause_overlay가
+	# 열려있으면 전부 return했으므로, 여기 도달했다는 것은 그 숫자 키들이 다른
+	# 오버레이의 의미(슬롯 선택, 색상 선택)와 겹치지 않는 "실제 플레이 상태"라는
+	# 뜻이다.
+	if HOTBAR_KEYS.has(event.keycode):
+		var player := get_tree().get_first_node_in_group("player")
+		if player != null:
+			player.select_hotbar_slot(HOTBAR_KEYS[event.keycode])
+			_update_hotbar_ui()
+		get_viewport().set_input_as_handled()
+		return
+
 	if event.keycode == KEY_ESCAPE:
 		pause_overlay.visible = true
 		get_tree().paused = true
@@ -323,6 +350,8 @@ func _save_slot(slot: int) -> void:
 		"color": [slot_colors[slot].r, slot_colors[slot].g, slot_colors[slot].b],
 		"equipment": player.equipment if player != null else {},
 		"wearables": player.wearables if player != null else {},
+		"hotbar": player.hotbar if player != null else [],
+		"active_hotbar_index": player.active_hotbar_index if player != null else 0,
 		"inventory": inventory,
 		"captured_animals": captured_animals,
 	}
@@ -356,6 +385,10 @@ func _apply_slot_data(data: Dictionary) -> void:
 		var wearable_data: Dictionary = data.get("wearables", {})
 		for slot_name in wearable_data.keys():
 			player.equip_wearable(slot_name, String(wearable_data[slot_name]))
+		var hotbar_data: Array = data.get("hotbar", [])
+		for i in range(hotbar_data.size()):
+			player.set_hotbar_item(i, String(hotbar_data[i]))
+		player.select_hotbar_slot(int(data.get("active_hotbar_index", 0)))
 	inventory.clear()
 	for key in data.get("inventory", {}).keys():
 		inventory[key] = int(data["inventory"][key])
@@ -365,6 +398,7 @@ func _apply_slot_data(data: Dictionary) -> void:
 	_update_label()
 	_update_capture_label()
 	_update_equipment_label()
+	_update_hotbar_ui()
 
 func _on_harvested(resource_name: String, amount: int) -> void:
 	if not inventory.has(resource_name) and inventory.size() >= INVENTORY_CAPACITY:
@@ -439,6 +473,25 @@ func _update_wearable_slots() -> void:
 		var slot_key: String = slot_keys[i]
 		var item_name: String = player.get_wearable(slot_key)
 		label.text = "%s: %s" % [WEARABLE_SLOT_NAMES[slot_key], item_name if item_name != "" else "-"]
+
+# inbox.md #6 5번: 항상 화면 하단에 보이는 5칸 핫바. 인벤토리(E) 오버레이와
+# 달리 토글되지 않고 계속 표시된다(마인크래프트/코어키퍼 참고 지시와 동일하게
+# 실제 게임 플레이 중에도 어떤 슬롯이 선택돼 있는지 항상 보여야 의미가 있다).
+# 선택된 슬롯은 self_modulate로 강조하고, 슬롯 안에는 번호+내용물(아직 비어
+# 있으면 "-")을 표시한다.
+const HOTBAR_ACTIVE_COLOR := Color(1.0, 0.85, 0.3)
+const HOTBAR_INACTIVE_COLOR := Color(1.0, 1.0, 1.0)
+
+func _update_hotbar_ui() -> void:
+	var player := get_tree().get_first_node_in_group("player")
+	var panels := hotbar_row.get_children()
+	for i in range(panels.size()):
+		var panel: Panel = panels[i]
+		var label: Label = panel.get_node("HotbarLabel")
+		var item_name: String = player.get_hotbar_item(i) if player != null else ""
+		label.text = "%d\n%s" % [i + 1, item_name if item_name != "" else "-"]
+		var is_active: bool = player != null and player.active_hotbar_index == i
+		panel.self_modulate = HOTBAR_ACTIVE_COLOR if is_active else HOTBAR_INACTIVE_COLOR
 
 func _update_capture_label() -> void:
 	if captured_animals.is_empty():

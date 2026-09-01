@@ -270,3 +270,27 @@ func equip_wearable(slot: String, item_name: String) -> void:
 
 func unequip_wearable(slot: String) -> void:
 	wearables[slot] = ""
+
+# inbox.md #6 5번: 휴대 장비 핫바. 인벤토리(E, 9칸 저장용 그리드)와는 별개로
+# "지금 손에 들고 있는 것"을 가리키는 슬롯 5개다 — inbox #6이 "인벤토리 그리드
+# 9칸과 섞이지 않게 UI/데이터 구조를 분리할 것"이라고 명시했으므로, inventory
+# Dictionary(자원 종류->개수)와는 완전히 별개인 배열로 둔다. wearables(inbox #6
+# 4번, status.md #56)와 마찬가지로 아직 인벤토리에서 핫바로 아이템을 옮기는
+# 상호작용(드래그 등)이 없어(범위 밖, 줍기/제작과 함께 inbox #4 5번이 미룬
+# 영역) 슬롯 내용물은 항상 빈 문자열이고, 이번 조각은 "숫자 1~5로 슬롯을
+# 선택할 수 있다"는 데이터 구조 + UI만 갖춘다.
+const HOTBAR_SIZE: int = 5
+
+var hotbar: Array[String] = ["", "", "", "", ""]
+var active_hotbar_index: int = 0
+
+func get_hotbar_item(index: int) -> String:
+	return hotbar[index] if index >= 0 and index < hotbar.size() else ""
+
+func set_hotbar_item(index: int, item_name: String) -> void:
+	if index >= 0 and index < hotbar.size():
+		hotbar[index] = item_name
+
+func select_hotbar_slot(index: int) -> void:
+	if index >= 0 and index < hotbar.size():
+		active_hotbar_index = index
