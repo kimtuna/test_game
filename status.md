@@ -104,3 +104,13 @@
   - `project.godot`: `[display]`에 `window/stretch/mode="canvas_items"`, `window/stretch/aspect="keep"` 추가. 이제 창 크기가 바뀌어도 1152x648 기준으로 설계된 게임 콘텐츠 전체가 종횡비를 유지한 채 스케일되어 보이며(레터박스 방식), 월드가 잘리거나 빈 배경이 늘어나는 문제가 사라짐.
 - 확인: `godot --headless --path . --quit` 에러 없음. `godot --headless --path . --script res://tests/loop_headless_test.gd` 실행 결과 `HEADLESS_LOOP_TEST: PASS (score=Score: 3, clear=true)` — 스트레치 설정 변경 후에도 이동→수집→점수→클리어 전체 루프 정상 동작 확인(스트레치 모드는 렌더링 스케일링만 영향을 주고 월드 좌표/충돌 판정에는 영향 없음을 재확인).
 - 다음 할 일: design.md의 1차 완료 정의(스폰→수집→점수 표시→클리어)는 여전히 충족된 상태이며, 이번 세션으로 UI 앵커·충돌 판정·텍스처·창 리사이즈까지 견고성 점검이 한 바퀴 돌았다. inbox.md에 새 지시가 없다면, 다음 자동 세션은 더 이상 사소한 견고성 결함을 억지로 찾기보다 — design.md가 명시한 대로 확장 기능(적, 타이머, 여러 레벨, 사운드, 아이템 종류 다양화 등)은 반드시 inbox.md 지시가 있어야 진행할 수 있으므로 — 이 status.md에 다음 확장 방향을 inbox.md로 알려달라는 요청을 남기고, 사용자가 실제로 에디터에서 플레이해 조작감을 확인해 줄 것을 권장하는 상태로 대기하는 것이 맞다.
+
+---
+
+### #11 — 2026-09-01 (자동 세션)
+
+- 한 일 (inbox 미처리 항목 없음. status.md #10까지 UI 앵커·충돌 판정·텍스처·창 리사이즈 견고성 점검이 한 바퀴 돌아 새로운 결함을 억지로 찾기보다, 코드 전체(scripts/, scenes/, project.godot, tests/, assets/)를 다시 읽으며 기능적 결함 유무를 확인함. 명백한 버그는 발견하지 못했으나, `UI/ScoreLabel`이 "Score: N" 형식으로 현재 점수만 보여주고 목표 개수(총 아이템 수)를 알려주지 않아, 플레이어가 몇 개를 더 모아야 클리어되는지 알 수 없는 점을 확인함. design.md 핵심 루프의 "점수가 오르고 화면에 표시된다"는 이미 문자 그대로는 충족되어 있었지만, 수집형 게임에서 진행도(N/총개수)를 보여주는 것은 새로운 게임플레이 기능(적/타이머/레벨/사운드 등 design.md가 막은 확장)이 아니라 기존에 이미 구현된 점수 표시 자체의 완성도를 높이는 것이므로 규칙 1(합격 기준)에 따라 이번 세션 작업으로 진행함):
+  - `scripts/main.gd`: `_update_label()`의 텍스트 포맷을 `"Score: %d"` → `"Score: %d / %d"` (score / total_items)로 변경.
+  - `tests/loop_headless_test.gd`: 변경된 텍스트 포맷에 맞춰 `expected_score_text`를 `"Score: %d / %d" % [total_items, total_items]`로 갱신.
+- 확인: `godot --headless --path . --quit` 에러 없음. `godot --headless --path . --script res://tests/loop_headless_test.gd` 실행 결과 `HEADLESS_LOOP_TEST: PASS (score=Score: 3 / 3, clear=true)` — 포맷 변경 후에도 이동→수집→점수→클리어 전체 루프 정상 동작 확인.
+- 다음 할 일: design.md의 1차 완료 정의는 여전히 충족된 상태다. inbox.md에 새 지시가 없는 한, 다음 세션도 design.md가 명시적으로 제한한 확장 범위(적, 타이머, 여러 레벨, 사운드 등)를 임의로 진행하지 말아야 한다. 이번 세션까지 UI 표시·앵커·충돌 판정·텍스처·창 리사이즈에 대한 점검이 여러 차례 반복되었으므로, 다음 자동 세션은 (1) 여전히 남아있을 수 있는 세부 결함을 새로운 관점에서 찾아보되 억지로 만들어내지 말고, (2) 특별한 결함이 없다면 사용자에게 inbox.md를 통한 다음 확장 방향(적, 타이머, 여러 레벨, 사운드, 재시작 기능 등) 지시를 요청하며 대기하는 것이 맞다.
