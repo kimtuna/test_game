@@ -16,6 +16,12 @@ extends Area2D
 # equipment["tool"])이 비어 있으면 상호작용 범위 안이라도 채집이 진행되지
 # 않는다 — design.md의 "장비를 맞춰 나간다"는 문장이 실제로 의미를 가지려면
 # 장비 없이는 아예 상호작용이 불가능해야 하기 때문이다.
+#
+# 이어서 등급(grade)과 장비를 실제로 연결했다: 장착한 도끼의 grade가 나무의
+# grade보다 낮으면 채집이 진행되지 않는다. "장비를 맞춰(강화/교체) 나간다"는
+# design.md 문장이 지금까지는 "장비가 있으면 등급과 무관하게 항상 통한다"는
+# 상태였는데, 이제는 더 높은 등급을 상대하려면 실제로 더 높은 등급의 장비로
+# 교체해야 하는 의미가 생긴다.
 
 signal harvested(resource_name: String, amount: int)
 
@@ -49,6 +55,9 @@ func _process(_delta: float) -> void:
 func _register_hit() -> void:
 	if not player_nearby.has_equipped("tool"):
 		print("도끼가 없어 채집할 수 없다.")
+		return
+	if player_nearby.get_equipment_grade("tool") < grade:
+		print("도끼 등급이 부족해 채집할 수 없다. (필요 등급: %d, 보유 등급: %d)" % [grade, player_nearby.get_equipment_grade("tool")])
 		return
 	hits_taken += 1
 	if hits_taken >= grade:

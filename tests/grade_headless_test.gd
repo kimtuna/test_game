@@ -1,9 +1,12 @@
 extends SceneTree
 
-# 헤드리스 환경에서 등급(grade) 시스템을 검증하는 통합 테스트.
+# 헤드리스 환경에서 등급(grade) 시스템 + 장비 등급 게이트를 검증하는 통합 테스트.
 # 실행: godot --headless --path . --script res://tests/grade_headless_test.gd
 # Main.tscn에 배치된 등급 2 나무(Tree2)와 등급 2 동물(Animal2)을 대상으로,
-# 기본 등급(1)보다 채집/사냥에 더 많은 상호작용이 필요한지 확인한다.
+# (1) 기본 등급(1)보다 채집/사냥에 더 많은 상호작용이 필요한지,
+# (2) 등급 1 장비(플레이어 기본 장비)로는 등급 2 대상과 아예 상호작용할 수
+#     없고, 등급 2 이상 장비로 교체해야 상호작용이 진행되는지(이번 세션에
+#     새로 추가된 장비 등급 게이트) 확인한다.
 # 기존 grade=1 개체(Tree, Animal)는 건드리지 않아 기존 테스트와 겹치지 않는다.
 
 func _initialize() -> void:
@@ -25,6 +28,19 @@ func _initialize() -> void:
 	player.global_position = tree2.global_position
 	for i in range(5):
 		await physics_frame
+
+	# 기본 장비(도끼 등급 1)로는 등급 2 나무를 채집할 수 없어야 한다.
+	Input.action_press("ui_accept")
+	await process_frame
+	Input.action_release("ui_accept")
+	await process_frame
+
+	if tree2.hits_taken != 0:
+		push_error("FAIL: 등급 1 도끼로 등급 2 나무를 채집 시도했는데 hits_taken이 증가함")
+		ok = false
+
+	# 등급 2 도끼로 교체하면 상호작용이 진행되어야 한다.
+	player.equip("tool", "도끼", 2)
 
 	Input.action_press("ui_accept")
 	await process_frame
@@ -50,15 +66,26 @@ func _initialize() -> void:
 		ok = false
 
 	var health_label: Label = animal2.get_node("HealthLabel")
-	if health_label.text != "200/200":
-		push_error("FAIL: 등급 2 동물의 초기 체력 라벨이 기대한 값(200/200)이 아님 (실제: %s)" % health_label.text)
-		ok = false
 
-	# ATTACK_DAMAGE(31) 기준 6회 공격해야 8%(16) 미만인 14/200에 도달한다.
 	player.global_position = animal2.global_position
 	for i in range(5):
 		await physics_frame
 
+	# 등급 1 도끼로는 등급 2 동물을 공격할 수 없어야 한다.
+	player.equip("tool", "도끼", 1)
+	Input.action_press("ui_accept")
+	await process_frame
+	Input.action_release("ui_accept")
+	await process_frame
+
+	if health_label.text != "200/200":
+		push_error("FAIL: 등급 1 도끼로 등급 2 동물을 공격했는데 체력이 감소함 (실제: %s)" % health_label.text)
+		ok = false
+
+	# 등급 2 도끼로 교체하면 공격이 진행되어야 한다.
+	player.equip("tool", "도끼", 2)
+
+	# ATTACK_DAMAGE(31) 기준 6회 공격해야 8%(16) 미만인 14/200에 도달한다.
 	for i in range(6):
 		Input.action_press("ui_accept")
 		await process_frame
@@ -80,13 +107,26 @@ func _initialize() -> void:
 		push_error("FAIL: 6회 공격 후 등급 2 동물의 체력 라벨이 기대한 값(14/200)이 아님 (실제: %s)" % health_label.text)
 		ok = false
 
+	# 등급 1 마취총으로는 포획할 수 없어야 한다(체력은 이미 8% 미만).
+	player.equip("weapon", "마취총", 1)
+	Input.action_press("capture")
+	await process_frame
+	Input.action_release("capture")
+	await process_frame
+
+	if not is_instance_valid(animal2) or not animal2.is_inside_tree():
+		push_error("FAIL: 등급 1 마취총으로도 등급 2 동물이 포획됨")
+		ok = false
+
+	# 등급 2 마취총으로 교체하면 포획에 성공해야 한다.
+	player.equip("weapon", "마취총", 2)
 	Input.action_press("capture")
 	await process_frame
 	Input.action_release("capture")
 	await process_frame
 
 	if is_instance_valid(animal2) and animal2.is_inside_tree():
-		push_error("FAIL: 체력이 8%% 미만(14/200)인데도 등급 2 동물이 포획되지 않음")
+		push_error("FAIL: 체력이 8%% 미만(14/200)이고 등급 2 마취총을 장착했는데도 포획되지 않음")
 		ok = false
 
 	if ok:

@@ -52,6 +52,11 @@ extends Area2D
 # 있으면 공격/포획이 진행되지 않는다. 공격은 "tool"(도끼) 슬롯을, 포획은
 # "weapon"(마취총) 슬롯을 요구한다 — 지금까지 ui_accept가 채집·공격을,
 # capture 액션이 포획을 담당해온 키 구분을 그대로 장비 슬롯 구분에 대응시켰다.
+#
+# 이어서 등급(grade)과 장비를 실제로 연결했다: 장착한 도끼/마취총의 grade가
+# 동물의 grade보다 낮으면 각각 공격/포획이 진행되지 않는다. tree.gd와 동일한
+# 판단(장비가 있는 것만으로는 부족하고, 대상의 등급 이상인 장비를 갖춰야
+# 상호작용이 통한다)을 여기에도 그대로 적용했다.
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -150,6 +155,9 @@ func _attack() -> void:
 	if not player_nearby.has_equipped("tool"):
 		print("도구가 없어 공격할 수 없다.")
 		return
+	if player_nearby.get_equipment_grade("tool") < grade:
+		print("도구 등급이 부족해 공격할 수 없다. (필요 등급: %d, 보유 등급: %d)" % [grade, player_nearby.get_equipment_grade("tool")])
+		return
 	health -= ATTACK_DAMAGE
 	print("동물을 공격했다. 남은 체력: %d" % health)
 	if health <= 0:
@@ -173,6 +181,9 @@ func _start_fleeing(threat: Node2D = null) -> void:
 func _try_capture() -> void:
 	if not player_nearby.has_equipped("weapon"):
 		print("마취총이 없어 포획할 수 없다.")
+		return
+	if player_nearby.get_equipment_grade("weapon") < grade:
+		print("마취총 등급이 부족해 포획할 수 없다. (필요 등급: %d, 보유 등급: %d)" % [grade, player_nearby.get_equipment_grade("weapon")])
 		return
 	if health < max_health * CAPTURE_HEALTH_RATIO:
 		print("동물을 포획했다.")

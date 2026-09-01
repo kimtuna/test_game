@@ -12,9 +12,15 @@ extends CharacterBody2D
 # 상점/제작 시스템이 전혀 없는 현재 단계에서 장비 자체를 얻을 방법이 없으면
 # 플레이가 처음부터 막히기 때문이다 — 즉 "기본 장비 지급"은 상식적 기본값이고,
 # 정말 새로운 것은 슬롯이 비면(unequip) 상호작용이 실제로 막힌다는 점이다.
+#
+# 각 슬롯에 "grade"를 추가했다 — design.md의 "유저는 더 높은 등급을 상대하기
+# 위해 장비를 맞춰(강화/교체) 나간다"는 문장을 실제로 의미 있게 만들려면,
+# 나무/동물의 grade(status.md #25)와 비교할 플레이어 쪽 수치가 있어야 하기
+# 때문이다. 기본 장비의 grade는 1로 시작한다 — 지금까지 배치된 grade=1
+# 나무/동물(Tree, Animal)은 기본 장비로 그대로 상호작용 가능해야 하므로.
 var equipment: Dictionary = {
-	"tool": "도끼",
-	"weapon": "마취총",
+	"tool": {"name": "도끼", "grade": 1},
+	"weapon": {"name": "마취총", "grade": 1},
 }
 
 const SPEED := 300.0
@@ -33,10 +39,13 @@ func _physics_process(_delta: float) -> void:
 	move_and_slide()
 
 func has_equipped(slot: String) -> bool:
-	return equipment.get(slot, "") != ""
+	return equipment.get(slot, {}).get("name", "") != ""
 
-func equip(slot: String, item_name: String) -> void:
-	equipment[slot] = item_name
+func get_equipment_grade(slot: String) -> int:
+	return equipment.get(slot, {}).get("grade", 0)
+
+func equip(slot: String, item_name: String, grade: int = 1) -> void:
+	equipment[slot] = {"name": item_name, "grade": grade}
 
 func unequip(slot: String) -> void:
-	equipment[slot] = ""
+	equipment[slot] = {"name": "", "grade": 0}
