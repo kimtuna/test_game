@@ -7,6 +7,8 @@ extends SceneTree
 #    낮춘 뒤 capture 액션을 누르면 실제로 포획되어(사라지고) CaptureLabel에
 #    반영되며, 이때는 harvested(고기)가 아니라 captured 경로이므로 인벤토리는
 #    비어 있어야 한다.
+# 공격당한 동물은 피격 도주로 잠시 자리를 이동하므로, 매 공격 사이에 도망이
+# 끝날 때까지 기다린 뒤 Player를 동물 위치로 다시 이동시켜 추격 상황을 흉내낸다.
 
 func _initialize() -> void:
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
@@ -40,6 +42,14 @@ func _initialize() -> void:
 		await process_frame
 		Input.action_release("ui_accept")
 		await process_frame
+
+		var wait_frames := 0
+		while animal.is_fleeing and wait_frames < 120:
+			await physics_frame
+			wait_frames += 1
+		player.global_position = animal.global_position
+		for j in range(5):
+			await physics_frame
 
 	if health_label.text != "7/100":
 		push_error("FAIL: 3회 공격 후 체력 라벨이 기대한 값(7/100)이 아님 (실제: %s)" % health_label.text)
