@@ -96,6 +96,17 @@ extends Area2D
 # 보장된다. deer_base.png/deer_walk_*.png를 확대해 직접 비교해봤는데 둘 다
 # 정면(카메라 쪽)을 향한 유사한 포즈라 "기본 정면" 기준이 서로 다르다고 볼
 # 근거는 없어서 별도 보정값은 추가하지 않았다.
+#
+# inbox.md #13 문제 2: 기존 코드는 이동 후 위치만 clamp하고 flee_direction은
+# 그대로 바깥쪽을 향한 채 남겨둬서, 경계에 닿으면 매 프레임 같은 자리로
+# 다시 clamp되며 사실상 멈춰버렸다. _reflect_direction()을 추가해 이동 후
+# 위치가 경계를 넘은 축의 방향 성분 부호를 뒤집어(반사) 다음 프레임부터
+# 안쪽으로 이동하도록 고쳤다. 이 함수는 position/direction/bounds만 받는
+# 순수 함수라 문제 3(배회)의 경계 처리에도 그대로 재사용할 수 있게 만들었다
+# (인스턴스 상태를 건드리지 않으므로 static으로 선언했다). 방향이 실제로
+# 바뀐 프레임에는 _update_facing()도 다시 호출해 flip_h가 반사된 방향을
+# 따라가도록 했다 — 안 그러면 문제 1에서 고친 방향 반전이 경계에서 튕길 때만
+# 어긋나 보이게 된다.
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -203,6 +214,10 @@ func _physics_process(delta: float) -> void:
 	global_position += flee_direction * FLEE_SPEED * delta
 	if terrain != null:
 		var bounds: Rect2 = terrain.get_island_bounds()
+		var reflected := _reflect_direction(global_position, flee_direction, bounds)
+		if reflected != flee_direction:
+			flee_direction = reflected
+			_update_facing(flee_direction)
 		global_position.x = clamp(global_position.x, bounds.position.x, bounds.end.x)
 		global_position.y = clamp(global_position.y, bounds.position.y, bounds.end.y)
 	flee_timer -= delta
@@ -267,6 +282,18 @@ func _update_facing(direction: Vector2) -> void:
 	if absf(direction.x) < 0.01:
 		return
 	sprite.flip_h = direction.x < 0.0
+
+# inbox.md #13 문제 2: position은 이동을 적용한 뒤의 값이어야 하며, 그
+# 위치가 경계를 넘은 축의 방향 성분만 부호를 뒤집어(반사) 반환한다 — 두 축
+# 모두 넘었다면(코너) 둘 다 뒤집는다. 인스턴스 상태를 참조하지 않는 순수
+# 함수라 문제 3(배회)의 경계 처리에도 그대로 재사용할 수 있다.
+static func _reflect_direction(position: Vector2, direction: Vector2, bounds: Rect2) -> Vector2:
+	var reflected := direction
+	if position.x <= bounds.position.x or position.x >= bounds.end.x:
+		reflected.x = -reflected.x
+	if position.y <= bounds.position.y or position.y >= bounds.end.y:
+		reflected.y = -reflected.y
+	return reflected
 
 func _try_capture(shooter: CharacterBody2D) -> void:
 	if not shooter.has_equipped("weapon"):
