@@ -294,7 +294,7 @@ design.md를 "동물의 숲 스타일 나만의 섬" 기획으로 전면 교체�
 
 근거: `inbox #16`이 정의한 자동검사 QA 갈래가 실제로 돌아가는 도구 없이는 매번 사람이 다시 판단해야 해서 "자동"이라는 이름이 무색해진다.
 
-상태: 미처리
+상태: 처리 완료 (status.md #78 — `text_overflow_check`(우선순위 1번)를 `tests/text_overflow_headless_test.gd`로 구현. 나머지 3개(`brightness_check`/`reachable_area_check`/`attack_anim_phase_check`)는 여전히 미착수 — 필요하면 별도 inbox 항목으로 다시 등록할 것)
 
 ---
 

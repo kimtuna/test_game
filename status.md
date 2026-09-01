@@ -428,3 +428,28 @@
 
 > [!IMPORTANT]
 > HARNESS_STOP: inbox.md의 유일한 미처리 항목(#14)을 이번 세션에서 처리 완료했다. 다른 미처리 지시가 없어 스스로 다음 작업을 고르지 않고 자동 루프를 멈춘다.
+
+---
+
+### #78 — 2026-09-02 07:10 (inbox #17: text_overflow_check 자동검사 도구 추가)
+
+요약: `inbox.md` #17이 지시한 4개 자동검사 QA 도구 중 우선순위 1번(`text_overflow_check`)을 `tests/text_overflow_headless_test.gd`로 구현했다. 처음 만든 버전(자기 rect vs 자기 `get_minimum_size()` 비교)은 실제로는 거의 항상 통과하는 무의미한 검사였다는 걸 실측으로 발견해 — Godot Control은 anchor로 계산한 rect가 자기 min_size보다 작으면 스스로 min_size까지 자동으로 커지기 때문에, "자기 rect < 자기 min_size"인 상황 자체가 정상 상태에서는 거의 발생하지 않는다 — 검사 기준을 "부모 컨테이너 rect 안에 들어가는가"로 다시 설계했다. 의도적으로 핫바 슬롯 크기를 2x2로 줄여 라벨이 삐져나오게 만든 뒤 도구가 실제로 잡아내는지 확인하는 방식으로 검증했고, 원상복구 후 재확인해 현재 게임 화면에는 텍스트 오버플로가 없음을 확인했다.
+
+- 계기: `inbox.md` #17 — `inbox #16`이 이름 붙인 자동검사 QA 4종(`text_overflow_check`/`brightness_check`/`reachable_area_check`/`attack_anim_phase_check`) 중 실행 도구가 없는 것들을 하나씩 만들라는 지시. 추천 우선순위(구현 난이도가 낮은 순) 1번이 `text_overflow_check`였고, 이번 세션이 처음으로 유일한 미처리 항목이라 그대로 채택했다.
+- 한 일:
+  - 처음에는 `Control.get_minimum_size()`(텍스트를 렌더링하는 데 필요한 크기)를 노드 자신의 `size`와 비교하는 방식으로 짰다. 실행해보니 MainMenu의 `ResolutionOption`(해상도 드롭다운)에서 "필요 너비 145 > 실제 너비 40" FAIL이 나왔는데, 이게 실제 버그인지 확인하려고 설정 패널을 실제로 열어(`SettingsButton` 클릭) 다시 스캔해보니 통과했다 — 즉 SettingsPanel이 `visible=false`인 상태에서는 그 안의 `VBoxContainer`가 아직 자식 크기를 다 채우지 못한 "레이아웃 미확정" 상태였을 뿐, 실제로 열었을 때는 문제가 없었다(오탐).
+  - 이 오탐을 계기로 별도 진단 스크립트(`tests/_tmp_hotbar_probe.gd`, 확인 후 삭제)로 핫바 슬롯 Panel의 `custom_minimum_size`를 2x2로 강제로 줄여 실측해봤더니, `HotbarLabel`의 실제 `size`가 부모 Panel(2x2)보다 훨씬 큰 (8, 68)로 나타났다 — Godot Control이 anchor 기반 rect가 자기 `min_size`보다 작으면 그 rect를 무시하고 스스로 `min_size`까지 자동으로 커지기 때문("자기 rect < 자기 min_size" 비교는 정상 상태에서 성립할 수 없는 사실상 무의미한 검사였다는 뜻)이다. 실제로 화면이 깨지는 시점은 이렇게 커진 라벨이 "자신을 담아야 할 부모 박스" 밖으로 삐져나오는 순간이라고 판단해, 검사 기준을 "자식 rect가 부모 Control의 rect(0,0~부모.size) 안에 들어가는가"로 다시 설계했다(장식용 `ColorRect` 배경은 부모에서 제외 — 전체 화면 크기라 "담는 박스"로 볼 수 없음).
+  - 화면 경계 검사(두 번째 검사축)는 `GameSettings.BASE_RESOLUTION`(1152x648, 콘텐츠 스케일 좌표계) 기준으로 CanvasLayer(고정 UI) 아래에 있는 노드에만 적용했다 — 처음에는 모든 Label에 적용했다가, `Tree2`/`Animal2`/`Fish`처럼 섬 곳곳에 흩어진 Node2D 오브젝트에 매달린 `GradeLabel`/`HealthLabel`(카메라를 따라 화면 밖 세계 좌표에도 정상적으로 존재할 수 있음)까지 "화면 밖으로 넘어감"으로 오탐하는 걸 발견해, CanvasLayer 조상이 있는 노드로 범위를 좁혔다.
+  - `inventory_headless_test.gd`가 쓰던 것과 동일한 방식(`main._on_harvested()`/`main._on_captured()` 직접 호출)으로 "오래 플레이한 뒤" 상태를 흉내내 인벤토리(4종 실제 자원을 9999개씩 + 자원1~5로 9칸 채움)/장비(자동 승급 발동)/포획 기록(사슴 x20)이 쌓인 상태에서도 오버플로가 없는지 함께 검사한다 — 이런 라벨은 빈 상태에서만 보면 항상 통과하고, 실제 문제는 값이 쌓였을 때 드러나기 때문이다.
+  - `SlotOverlay`/`CustomizationOverlay`/`TutorialOverlay`/`PauseOverlay`/`InventoryOverlay`처럼 기본적으로 닫혀 있거나 온보딩 이후 다시 열리지 않는 오버레이는, `visible`을 임시로 강제 `true`로 바꿔 실제로 화면에 보이는 상태를 만든 뒤 스캔하고 원래 상태로 되돌리는 `_scan_forced_visible()` 헬퍼로 하나씩 검사한다(ResolutionOption 오탐과 같은 이유로 "실제로 보여야 컨테이너 레이아웃이 확정된다"는 원칙을 일관되게 적용).
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음(GDScript 신규 파일 추가만 있었고 기존 게임 코드는 전혀 건드리지 않음).
+  - `tests/text_overflow_headless_test.gd`를 3회 연속 실행 — 매번 `PASS`, 결정적으로 동일한 결과(플레이키니스 없음).
+  - 검증(오탐 배제 확인): `scenes/Main.tscn`의 `HotbarSlot0` `custom_minimum_size`를 2x2로 임시로 줄여 실제로 라벨이 삐져나오게 만든 뒤 도구를 실행해 `FAIL`(정확히 어떤 노드가 어떤 부모 박스를 얼마나 벗어났는지 텍스트까지 포함해 보고)로 잡아내는 것을 확인했고, `git checkout -- scenes/Main.tscn`으로 원복한 뒤 다시 `PASS`를 확인했다 — 도구가 실제로 오버플로를 검출할 능력이 있다는 걸 검증한 뒤에야 완성으로 간주했다.
+  - `ps aux`로 이번 세션이 새로 띄운 채 남은 godot 프로세스가 없는지 확인했다. 임시 진단 스크립트(`tests/_tmp_hotbar_probe.gd`)는 확인 후 삭제해 커밋에 포함되지 않았다.
+  - 도구를 현재 게임 상태에 그대로 실행한 결과는 `PASS`였다 — 즉 이번 세션은 버그를 고치는 세션이 아니라 도구를 만드는 세션(inbox #17이 명시적으로 "도구 제작과 도구가 찾아낸 버그 수정은 서로 다른 '기능 하나'"라고 구분함)이었고, 실행해보니 실제로 고쳐야 할 오버플로가 발견되지 않아 `inbox.md`에 새로 등록할 항목도 없다.
+- 남은 제약: `inbox.md` #17이 언급한 나머지 3개 자동검사 도구(`brightness_check`/`reachable_area_check`/`attack_anim_phase_check`)는 여전히 미착수다. 이번 도구는 Label/RichTextLabel/Button만 검사하고(현재 프로젝트에 RichTextLabel 사용처는 없음), 부모가 `Control`이 아닌 경우(예: 최상위 CanvasLayer 바로 아래)는 컨테이너 오버플로 검사를 건너뛴다 — 지금 UI 구조에서는 문제되지 않지만 향후 구조가 바뀌면 재검토가 필요할 수 있다. 화면 경계 검사는 `GameSettings.BASE_RESOLUTION`(콘텐츠 스케일 좌표계) 기준이라, 실제 창 크기(해상도 선택)가 달라져도 항상 같은 논리 좌표계로 검사되는 것이 의도된 동작이다(status.md #71/#72의 "해상도는 화면 크기 취향일 뿐 시야에 영향 없음" 설계와 일관). 그 외 기존 미해결 사항(원격 피어 애니메이션 미동기화, 나무/식물/물고기가 절차적 단색 사각형, 아이템 줍기/제작)도 그대로 남아있다.
+- 다음 할 일: `inbox.md`의 모든 항목(#1~#17)이 처리 완료 상태다(단, #17은 4개 중 1개만 구현했지만, 지시 원문이 "하나를 골라"라고 명시했으므로 이번 세션으로 그 지시 자체는 완전히 이행됨). 규칙 7에 따라, 남은 3개 자동검사 도구나 위 "남은 제약"에 적힌 항목들을 세션이 스스로 골라 진행하지 않고 후보로만 남긴다. 사용자가 실제로 플레이해보거나 필요하다고 판단한 도구를 `inbox.md`에 새 지시로 남긴 뒤 하네스 데몬을 재기동해야 다음 실질적 작업이 시작된다.
+
+> [!IMPORTANT]
+> HARNESS_STOP: inbox.md의 유일한 미처리 항목(#17)을 이번 세션에서 처리 완료했다(지시가 "4개 중 하나를 골라 만들 것"이었으므로 1개 구현으로 완전 이행). 다른 미처리 지시가 없어 스스로 다음 작업을 고르지 않고 자동 루프를 멈춘다.
