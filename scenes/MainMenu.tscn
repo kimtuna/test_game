@@ -69,6 +69,14 @@ custom_minimum_size = Vector2(0, 44)
 theme_override_font_sizes/font_size = 20
 text = "전체화면"
 
+[node name="ResolutionLabel" type="Label" parent="SettingsPanel"]
+theme_override_font_sizes/font_size = 16
+text = "해상도"
+
+[node name="ResolutionOption" type="OptionButton" parent="SettingsPanel"]
+custom_minimum_size = Vector2(0, 44)
+theme_override_font_sizes/font_size = 20
+
 [node name="BackButton" type="Button" parent="SettingsPanel"]
 custom_minimum_size = Vector2(0, 44)
 theme_override_font_sizes/font_size = 20
@@ -79,3 +87,4 @@ text = "뒤로"
 [connection signal="pressed" from="MainPanel/QuitButton" to="." method="_on_quit_pressed"]
 [connection signal="pressed" from="SettingsPanel/BackButton" to="." method="_on_back_pressed"]
 [connection signal="toggled" from="SettingsPanel/FullscreenCheck" to="." method="_on_fullscreen_toggled"]
+[connection signal="item_selected" from="SettingsPanel/ResolutionOption" to="." method="_on_resolution_selected"]

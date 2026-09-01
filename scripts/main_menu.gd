@@ -9,6 +9,7 @@ extends Control
 @onready var main_panel: VBoxContainer = $MainPanel
 @onready var settings_panel: VBoxContainer = $SettingsPanel
 @onready var fullscreen_check: CheckButton = $SettingsPanel/FullscreenCheck
+@onready var resolution_option: OptionButton = $SettingsPanel/ResolutionOption
 
 func _ready() -> void:
 	# 헤드리스 실행(DisplayServer가 실제 창을 갖지 않음)에서는 창 모드 조회/
@@ -17,6 +18,9 @@ func _ready() -> void:
 	# 안 된다.
 	if DisplayServer.get_name() != "headless":
 		fullscreen_check.button_pressed = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	for i in range(GameSettings.RESOLUTIONS.size()):
+		resolution_option.add_item(GameSettings.resolution_label(i))
+	resolution_option.select(GameSettings.resolution_index)
 
 func _on_start_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
@@ -36,3 +40,6 @@ func _on_fullscreen_toggled(pressed: bool) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if pressed else DisplayServer.WINDOW_MODE_WINDOWED)
+
+func _on_resolution_selected(index: int) -> void:
+	GameSettings.set_resolution(index)

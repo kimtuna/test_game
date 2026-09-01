@@ -21,6 +21,8 @@ func _initialize() -> void:
 	var main_panel: Control = main_menu.get_node("MainPanel")
 	var settings_panel: Control = main_menu.get_node("SettingsPanel")
 	var fullscreen_check: CheckButton = main_menu.get_node("SettingsPanel/FullscreenCheck")
+	var resolution_option: OptionButton = main_menu.get_node("SettingsPanel/ResolutionOption")
+	var game_settings: Node = root.get_node("GameSettings")
 
 	var ok := true
 
@@ -29,6 +31,22 @@ func _initialize() -> void:
 		ok = false
 	if fullscreen_check.button_pressed:
 		push_error("FAIL: 헤드리스 환경인데 전체화면 체크가 초기부터 켜져 있음")
+		ok = false
+	if resolution_option.item_count != game_settings.RESOLUTIONS.size():
+		push_error("FAIL: 해상도 옵션 목록이 game_settings.RESOLUTIONS와 개수가 다름 (%d != %d)" % [resolution_option.item_count, game_settings.RESOLUTIONS.size()])
+		ok = false
+	if resolution_option.selected != game_settings.resolution_index:
+		push_error("FAIL: 해상도 드롭다운의 초기 선택이 game_settings.resolution_index와 다름")
+		ok = false
+
+	# 해상도를 바꾸면(마지막 항목 선택) 헤드리스에서도 에러 없이 처리되고,
+	# game_settings.resolution_index가 실제로 갱신되는지 확인한다.
+	var last_index: int = game_settings.RESOLUTIONS.size() - 1
+	resolution_option.select(last_index)
+	resolution_option.emit_signal("item_selected", last_index)
+	await process_frame
+	if game_settings.resolution_index != last_index:
+		push_error("FAIL: 해상도 선택 후 game_settings.resolution_index가 갱신되지 않음")
 		ok = false
 
 	main_menu.get_node("MainPanel/SettingsButton").emit_signal("pressed")
