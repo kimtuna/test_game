@@ -7,3 +7,7 @@ export_presets.cfg
 # macOS
 .DS_Store
 .harness/
+
+# 스프라이트 생성 도구(tools/sprite_gen.py)의 후보 산출물 — 최종 채택본이
+# 아니므로 커밋하지 않는다 (assets/ART_STYLE.md "파일 구성 규칙")
+tools/sprite_candidates/
