@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" path="res://scenes/Tree.tscn" id="3"]
 [ext_resource type="Script" path="res://scripts/main.gd" id="4"]
 [ext_resource type="PackedScene" path="res://scenes/Animal.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/Fish.tscn" id="6"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("4")
@@ -33,6 +34,13 @@ position = Vector2(300, 450)
 
 [node name="Animal2" parent="." instance=ExtResource("5")]
 position = Vector2(700, 800)
+grade = 2
+
+[node name="Fish" parent="." instance=ExtResource("6")]
+position = Vector2(1450, 850)
+
+[node name="Fish2" parent="." instance=ExtResource("6")]
+position = Vector2(150, 200)
 grade = 2
 
 [node name="UI" type="CanvasLayer" parent="."]
@@ -183,7 +191,7 @@ theme_override_font_sizes/font_size = 26
 text = "섬에 온 것을 환영합니다
 
 방향키: 이동
-Space / Enter: 나무 채집, 동물 공격
+Space / Enter: 나무 채집, 동물 공격, 물고기 낚시
 C: 동물 체력이 8% 미만일 때 마취총으로 포획
 
 아무 키나 눌러 시작하기"

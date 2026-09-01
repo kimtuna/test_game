@@ -21,6 +21,7 @@ const MAX_EQUIPMENT_GRADE: int = 3
 const RESOURCE_TO_SLOT: Dictionary = {
 	"통나무": "tool",
 	"고기": "weapon",
+	"물고기": "rod",
 }
 
 var inventory: Dictionary = {}
