@@ -107,6 +107,17 @@ extends Area2D
 # 바뀐 프레임에는 _update_facing()도 다시 호출해 flip_h가 반사된 방향을
 # 따라가도록 했다 — 안 그러면 문제 1에서 고친 방향 반전이 경계에서 튕길 때만
 # 어긋나 보이게 된다.
+#
+# inbox.md #13 문제 3: 도주 중이 아니면 동물이 아예 움직이지 않던 문제를
+# 고쳤다. "정지 → 무작위 방향으로 잠깐 이동 → 다시 정지"를 반복하는 배회
+# 행동을 추가했다(_process_wandering). 이동/정지 구간의 이동 로직은 도주
+# 이동과 완전히 같은 모양(이동 적용 → 경계 반사 → clamp)이라, 그 공통 부분을
+# _move_with_reflection()으로 뽑아 도주(_physics_process)와 배회 양쪽에서
+# 재사용한다 — _reflect_direction()이 순수 함수로 만들어져 있었던 덕분에
+# 그대로 가져다 쓸 수 있었다. 도주가 시작되면(_start_fleeing) 배회 상태를
+# 즉시 정지로 리셋해 두 행동이 같은 프레임에 겹쳐 움직이지 않게 했고, 도주가
+# 끝나면 배회는 다음 무작위 정지 구간부터 다시 시작한다(도주 직후 곧바로
+# 다시 움직이면 "쫓기다가 바로 다시 태연히 돌아다니는" 것처럼 보여 부자연스럽다).
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -116,6 +127,12 @@ const ATTACK_DAMAGE: int = 31
 const CAPTURE_HEALTH_RATIO: float = 0.08
 const FLEE_SPEED: float = 220.0
 const FLEE_DURATION: float = 0.6
+
+const WANDER_SPEED: float = 55.0
+const WANDER_MOVE_MIN: float = 1.0
+const WANDER_MOVE_MAX: float = 2.5
+const WANDER_PAUSE_MIN: float = 1.5
+const WANDER_PAUSE_MAX: float = 4.0
 
 const BASE_TEXTURE_PATH := "res://assets/sprites/animal/deer_base.png"
 const WALK_FRAME_COUNT := 16
@@ -133,6 +150,10 @@ var is_fleeing: bool = false
 var flee_timer: float = 0.0
 var flee_direction: Vector2 = Vector2.ZERO
 var terrain: Node = null
+
+var is_wander_moving: bool = false
+var wander_timer: float = 0.0
+var wander_direction: Vector2 = Vector2.ZERO
 
 var base_texture: Texture2D = null
 var walk_frames: Array[Texture2D] = []
@@ -164,6 +185,7 @@ func _ready() -> void:
 	grade_label.text = "Lv.%d" % grade
 	_update_health_label()
 	terrain = get_tree().get_first_node_in_group("terrain")
+	wander_timer = randf_range(WANDER_PAUSE_MIN, WANDER_PAUSE_MAX)
 
 func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("player"):
@@ -209,21 +231,50 @@ func _physics_process(delta: float) -> void:
 		if player_in_sound_range != null and player_in_sound_range.velocity.length() > 0.0:
 			_start_fleeing(player_in_sound_range)
 		else:
-			_update_walk_animation(delta, false)
+			_process_wandering(delta)
 			return
-	global_position += flee_direction * FLEE_SPEED * delta
-	if terrain != null:
-		var bounds: Rect2 = terrain.get_island_bounds()
-		var reflected := _reflect_direction(global_position, flee_direction, bounds)
-		if reflected != flee_direction:
-			flee_direction = reflected
-			_update_facing(flee_direction)
-		global_position.x = clamp(global_position.x, bounds.position.x, bounds.end.x)
-		global_position.y = clamp(global_position.y, bounds.position.y, bounds.end.y)
+	flee_direction = _move_with_reflection(flee_direction, FLEE_SPEED, delta)
 	flee_timer -= delta
 	if flee_timer <= 0.0:
 		is_fleeing = false
 	_update_walk_animation(delta, is_fleeing)
+
+# inbox.md #13 문제 3: 도주 중이 아닐 때 호출된다. wander_timer가 0이 되면
+# 정지↔이동 상태를 전환한다 — 정지에서 이동으로 바뀔 때만 새 무작위 방향을
+# 뽑고(이동 중에는 방향을 유지해야 갈지자로 떨림 없이 자연스럽다), 각 상태의
+# 지속 시간도 매번 새로 무작위로 뽑아 모든 개체가 같은 박자로 움직이지 않게
+# 한다.
+func _process_wandering(delta: float) -> void:
+	wander_timer -= delta
+	if wander_timer <= 0.0:
+		if is_wander_moving:
+			is_wander_moving = false
+			wander_timer = randf_range(WANDER_PAUSE_MIN, WANDER_PAUSE_MAX)
+		else:
+			is_wander_moving = true
+			wander_direction = Vector2.RIGHT.rotated(randf_range(0.0, TAU))
+			_update_facing(wander_direction)
+			wander_timer = randf_range(WANDER_MOVE_MIN, WANDER_MOVE_MAX)
+	if is_wander_moving:
+		wander_direction = _move_with_reflection(wander_direction, WANDER_SPEED, delta)
+	_update_walk_animation(delta, is_wander_moving)
+
+# 도주 이동과 배회 이동이 공유하는 "이동 적용 → 경계에서 반사 → clamp"
+# 로직을 하나로 묶었다(inbox #13 문제 2에서 만든 _reflect_direction()이 순수
+# 함수라 그대로 재사용 가능했다). 방향이 실제로 바뀐 프레임에는
+# _update_facing()도 함께 호출해 flip_h가 반사된 방향을 따라가게 한다.
+func _move_with_reflection(direction: Vector2, speed: float, delta: float) -> Vector2:
+	global_position += direction * speed * delta
+	var result := direction
+	if terrain != null:
+		var bounds: Rect2 = terrain.get_island_bounds()
+		var reflected := _reflect_direction(global_position, direction, bounds)
+		if reflected != direction:
+			result = reflected
+			_update_facing(result)
+		global_position.x = clamp(global_position.x, bounds.position.x, bounds.end.x)
+		global_position.y = clamp(global_position.y, bounds.position.y, bounds.end.y)
+	return result
 
 # player.gd의 _update_walk_animation과 동일한 패턴(inbox #9 4번) — 이동 중일
 # 때만 WALK_FRAME_DURATION마다 프레임을 순환시키고, 멈추면 즉시 정지 텍스처
@@ -263,6 +314,8 @@ func _attack(shooter: CharacterBody2D) -> void:
 
 func _start_fleeing(threat: Node2D = null) -> void:
 	is_fleeing = true
+	is_wander_moving = false
+	wander_timer = randf_range(WANDER_PAUSE_MIN, WANDER_PAUSE_MAX)
 	flee_timer = FLEE_DURATION
 	var reference: Node2D = threat if threat != null else player_nearby
 	if reference != null:
