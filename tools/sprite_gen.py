@@ -7,13 +7,15 @@ assets/ART_STYLE.md의 규칙(8의 배수 캔버스, 3톤 색상 공식, 외곽�
 생성해 tools/sprite_candidates/ 아래에 저장한다 — 이 산출물은 최종
 채택본이 아니므로 저장소에 커밋하지 않는다(ART_STYLE.md "파일 구성 규칙").
 
-이 스크립트는 생성 단계까지만 담당한다. 후보를 비교 그리드로 합쳐서
-Read 도구로 시각 확인 후 선택하는 절차, 애니메이션 프레임 확인 루프는
-inbox.md #8 3번/4번에서 별도로 만든다.
+이 스크립트는 생성 + 비교 그리드 합성까지 담당한다(inbox.md #8 3번).
+후보 10장을 만든 뒤 --grid로 번호가 붙은 확대 비교 이미지 한 장을 만들면,
+그 이미지를 Read 도구로 직접 열어 눈으로 비교해서 고르는 절차를 따른다
+(프로그램적 점수만으로 자동 선택하지 않는다 — inbox #8 3번 요구사항).
+애니메이션 프레임 확인 루프는 inbox.md #8 4번에서 별도로 만든다.
 
 사용 예:
     python3 tools/sprite_gen.py --list
-    python3 tools/sprite_gen.py --target player_body_base --count 10
+    python3 tools/sprite_gen.py --target player_body_base --count 10 --grid
 """
 
 import argparse
@@ -22,7 +24,7 @@ import json
 import random
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 CANDIDATES_DIR = Path(__file__).resolve().parent / "sprite_candidates"
 
@@ -148,6 +150,42 @@ def generate(target_name, count, out_dir=None, seed=None):
     return out_dir, [out_dir / m["file"] for m in manifest]
 
 
+def make_comparison_grid(files, out_path, scale=6, columns=5, label_h=14):
+    """후보 PNG들을 확대 + 번호 라벨을 붙여 한 장의 비교 그리드로 합친다.
+
+    ART_STYLE.md의 하드 엣지 규칙을 유지하기 위해 확대는 Image.NEAREST만
+    쓴다(보간 금지). 번호 라벨은 스프라이트 본체가 아니라 비교용 UI이므로
+    이 규칙 대상이 아니다 — 그리드 셀 아래 여백에만 그린다.
+    """
+    files = list(files)
+    if not files:
+        raise ValueError("비교 그리드를 만들 후보 파일이 없습니다.")
+
+    thumbs = [Image.open(f).convert("RGBA") for f in files]
+    w, h = thumbs[0].size
+    cell_w, cell_h = w * scale, h * scale
+    rows = (len(thumbs) + columns - 1) // columns
+    pad = 4
+
+    grid = Image.new(
+        "RGBA",
+        (columns * (cell_w + pad) + pad, rows * (cell_h + label_h + pad) + pad),
+        (40, 40, 40, 255),
+    )
+    draw = ImageDraw.Draw(grid)
+
+    for i, thumb in enumerate(thumbs):
+        col, row = i % columns, i // columns
+        x = pad + col * (cell_w + pad)
+        y = pad + row * (cell_h + label_h + pad)
+        big = thumb.resize((cell_w, cell_h), Image.NEAREST)
+        grid.paste(big, (x, y), big)
+        draw.text((x, y + cell_h + 1), f"#{i:02d}", fill=(255, 255, 255, 255))
+
+    grid.save(out_path, "PNG")
+    return out_path
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", help="생성할 대상 이름")
@@ -158,6 +196,10 @@ def main():
     )
     parser.add_argument("--seed", default=None, help="재현 가능한 결과를 위한 시드")
     parser.add_argument("--list", action="store_true", help="사용 가능한 target 목록 출력")
+    parser.add_argument(
+        "--grid", action="store_true",
+        help="생성 직후 번호 라벨이 붙은 비교 그리드(comparison.png)를 out_dir에 함께 만든다",
+    )
     args = parser.parse_args()
 
     if args.list or not args.target:
@@ -168,6 +210,10 @@ def main():
 
     out_dir, files = generate(args.target, args.count, args.out, args.seed)
     print(f"{len(files)}장 생성 완료 -> {out_dir}")
+
+    if args.grid:
+        grid_path = make_comparison_grid(files, out_dir / "comparison.png")
+        print(f"비교 그리드 생성 완료 -> {grid_path}")
 
 
 if __name__ == "__main__":
