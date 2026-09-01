@@ -37,10 +37,10 @@ func _initialize() -> void:
 		ok = false
 
 	# 이제 플레이어가 왼쪽으로 이동(발소리 발생)한다. 공격/포획 입력은 없다.
-	Input.action_press("ui_left")
+	Input.action_press("move_left")
 	for i in range(5):
 		await physics_frame
-	Input.action_release("ui_left")
+	Input.action_release("move_left")
 
 	if not animal.is_fleeing:
 		push_error("FAIL: 이동 중인 플레이어가 발소리 범위 안에 있는데도 동물이 도주하지 않음")

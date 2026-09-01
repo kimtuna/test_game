@@ -85,7 +85,7 @@ func set_body_color(color: Color) -> void:
 func _physics_process(_delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
-	var direction := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	velocity = direction * SPEED
 	move_and_slide()
 
