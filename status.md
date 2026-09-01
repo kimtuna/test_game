@@ -75,3 +75,14 @@
   - `project.godot`: `config/name`을 `"My 2D Game"` → `"Test Game"`으로 수정. 게임플레이 로직/씬 구조 변경 없음 (design.md가 금지한 확장 기능이 아니라 기존 결과물의 정합성 결함 수정).
 - 확인: `godot --headless --path . --quit` 에러 없음. `godot --headless --path . --script res://tests/loop_headless_test.gd` 실행 결과 `HEADLESS_LOOP_TEST: PASS (score=Score: 3, clear=true)` — 이름 변경이 게임 로직에 영향 없음을 확인.
 - 다음 할 일: design.md의 1차 완료 정의(스폰→수집→점수 표시→클리어)는 코드 검증 및 시각적 배치 점검까지 마쳤다고 판단한다. inbox.md에 새 지시가 없는 한, 다음 세션은 design.md가 명시적으로 제한한 확장 범위(적, 타이머, 여러 레벨, 사운드 등)를 임의로 진행하지 말고, 사용자에게 inbox.md를 통한 다음 방향 지시를 요청하는 상태로 대기한다.
+
+---
+
+### #8 — 2026-09-01 (자동 세션)
+
+- 한 일 (inbox 미처리 항목 없음. status.md #7이 이미 1차 완료 정의 충족을 확인했고, design.md가 확장 기능은 inbox 지시 없이는 진행하지 말라고 명시하므로 새 게임플레이 기능은 만들지 않았다. 대신 기존 코드를 다시 점검하며 규칙 1(합격 기준)에 걸리는 견고성 결함 하나를 발견해 수정함):
+  - `scripts/item.gd`의 `_on_body_entered()`가 `body is CharacterBody2D` 타입 체크로 수집 여부를 판정하고 있었다. 지금은 Player가 유일한 `CharacterBody2D`라 우연히 맞지만, 나중에 적(enemy)을 `CharacterBody2D`로 추가하면 아이템이 적과 닿아도 수집되는 잘못된 동작으로 이어지는 잠재 버그였다. 이는 design.md가 말하는 "확장 기능"이 아니라 기존 핵심 루프 구현의 잠재적 결함 수정이므로 이번 세션 범위로 진행했다.
+  - `scripts/player.gd`: `_ready()`에서 `add_to_group("player")` 추가.
+  - `scripts/item.gd`: `_on_body_entered()` 판정을 `body.is_in_group("player")`로 변경.
+- 확인: `godot --headless --path . --quit` 에러 없음. `godot --headless --path . --script res://tests/loop_headless_test.gd` 실행 결과 `HEADLESS_LOOP_TEST: PASS (score=Score: 3, clear=true)` — 변경 후에도 이동→수집→점수→클리어 전체 루프 정상 동작 확인.
+- 다음 할 일: design.md의 1차 완료 정의는 여전히 충족된 상태다. inbox.md에 새 지시가 없는 한, 다음 세션도 확장 범위(적, 타이머, 여러 레벨, 사운드 등)를 임의로 진행하지 말고 사용자의 inbox 지시를 기다리는 것이 맞다. 다만 "대기"가 곧 "할 일 없음"을 뜻하지는 않는다 — 기존 구현을 다시 읽어보며 확장 범위를 벗어나지 않는 선에서의 견고성/버그 점검은 매 세션 유효한 작업이 될 수 있다.
