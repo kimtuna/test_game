@@ -22,3 +22,24 @@
 **발견된 문제 / inbox 등록**: 위 CAUTION(screencapture 권한 문제)을 제외하면 새로 발견된 문제 없음. 기존에 알려진 `animal_hunt`/`animal_capture` 테스트 플레이키니스는 `inbox.md #14`로 새로 등록해 다음 사이클에서 조사하도록 했다(아래 참고).
 
 **관련 inbox**: `#14` (테스트 플레이키니스 조사 지시)
+
+---
+
+### #2 — 2026-09-02 06:41 (사람이 직접 실행, 대화 중 AI에게 요청)
+
+**범위**: 전체 QA — 헤드리스 테스트 전체 재실행 + 실제 창 실행 + 스크린샷 확인.
+
+**헤드리스 테스트 (36개, 2-프로세스/헬퍼 스크립트 5개 제외)**:
+- 최초 실행: 34개 통과, 2개 실패 — `animal_capture_headless_test`(FAIL), `animal_hunt_headless_test`(60초 타임아웃, `SCRIPT ERROR: Invalid access to property or key 'is_fleeing' on a base object of type 'previously freed'`) — `qa_test.md #1`/`inbox.md #14`가 이미 기록한 fire 입력 이중 소비 플레이키니스와 동일 계열 증상(이번엔 몹이 과다 데미지로 죽어 freed된 객체에 접근하며 행이 걸리는 새 증상 패턴).
+- QA 도중 이 저장소에서 별도로(사람이 직접, 이 대화와 무관하게) `launchctl kickstart`로 돌고 있던 하네스 사이클(06:28 시작)이 정확히 이 `inbox #14`를 처리해 `daff47f`/`f08288e` 커밋으로 근본 수정(테스트 헬퍼 `tests/test_input_helper.gd`의 `simulate_click()`으로 10개 테스트 파일 교체)을 푸시했다. `git pull`로 반영한 뒤 재검증:
+  - `animal_hunt_headless_test`/`animal_capture_headless_test` 개별 재실행: 둘 다 `PASS`.
+  - 전체 36개 재실행: **36/36 통과**, 실패 없음.
+
+**실제 창 실행 + 스크린샷 확인**:
+- `godot --path .`로 실제 창을 띄워 크래시 없이 정상 기동 확인(렌더러 OpenGL 4.1 Metal Compatibility, Apple M1, 에러 로그 없음).
+- `screencapture -x`로 스크린샷 촬영 성공(`qa_test.md #1`에서 겪었던 macOS 화면 기록 권한 문제가 이번 세션/터미널에서는 재현되지 않음) — Read 도구로 직접 확인한 결과 메인 메뉴("나만의 섬" 타이틀, 시작/설정/종료 버튼)가 레이아웃 깨짐이나 겹침 없이 정상 렌더링됨.
+- 확인 후 `pkill`로 프로세스 종료, `ps aux`로 잔여 프로세스 없음을 확인.
+
+**발견된 문제 / inbox 등록**: 새로 발견된 문제 없음 — 발견했던 유일한 문제(`inbox #14` 계열 플레이키니스)는 QA 도중 별도로 이미 수정·검증됐다. 화면 검사(메인 메뉴)에서는 어색하거나 잘못된 부분을 발견하지 못했다.
+
+**관련 inbox**: 없음(신규 등록 없음). 별도로 `inbox #15`(대화 중 사용자가 직접 지시)를 등록해 `CLAUDE.md` 규칙 4에 "화면 검사 중 문제 발견 시 inbox.md에 자동 등록" 절차를 추가함 — 이번 QA와는 별개의 프로토콜 변경.
