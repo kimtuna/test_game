@@ -56,6 +56,18 @@ const FIRE_ANGLE_TOLERANCE_DEG := 25.0
 
 var facing_direction: Vector2 = Vector2.DOWN
 
+# inbox.md #6 1번: 위 status.md #53 판단(마우스 시뮬레이션이 불가능해 조준을
+# 이동 방향으로 대체)이 실제로는 "마우스로 조준해도 원하는 대로 안 맞는다"는
+# 버그로 이어졌다 — 총이라면 이동 방향이 아니라 실제 마우스 커서 방향을
+# 조준해야 한다. `aim_direction`을 조준 판정과 조준선 표시 양쪽에 쓰는 단일
+# 값으로 두고, 매 물리 프레임 `_update_aim_direction()`에서 갱신한다.
+# 헤드리스 환경(자동 QA)에서는 실제 마우스 좌표가 없어(get_global_mouse_position()이
+# 항상 (0,0) 근처의 의미 없는 값을 반환) `facing_direction`(이동 방향, 기존
+# 헤드리스 테스트들이 직접 설정해 조준을 결정론적으로 통제하는 값)으로
+# 그대로 대체한다 — main_menu.gd의 DisplayServer.get_name() == "headless" 분기와
+# 동일한 패턴.
+var aim_direction: Vector2 = Vector2.DOWN
+
 # design.md "기본 코디(의상) 제공: 별도로 맞추지 않아도 입고 시작할 수 있는
 # 기본 복장이 있다"를 지금까지는 "장비 슬롯이 처음부터 채워져 있다"로만
 # 해석했다(player.gd 상단 주석 참고) — 실제로 화면에 "옷을 입고 있다"고 보일
@@ -124,6 +136,8 @@ func _physics_process(_delta: float) -> void:
 	if direction.length() > 0.0:
 		facing_direction = direction.normalized()
 
+	_update_aim_direction()
+
 	# 좌클릭(발사)/우클릭(탄종류 변경)/R(재장전) 모두 여기서 폴링한다 — 기존
 	# 헤드리스 테스트들이 Input.action_press()로 입력을 흉내내는데, 이 방식은
 	# 실제 InputEvent를 만들어 _input/_unhandled_input으로 전달하지 않고 Input
@@ -162,13 +176,38 @@ func _find_fire_target() -> Node:
 			# 그대로 비교하면 정반대 방향(180도 근처, 부호에 따라 -180으로 나올
 			# 수 있음)이 오히려 tolerance보다 "작다"고 잘못 판정돼 반대쪽을
 			# 조준해도 맞아버리는 버그가 생긴다.
-			var angle := absf(rad_to_deg(facing_direction.angle_to(to_target.normalized())))
+			var angle := absf(rad_to_deg(aim_direction.angle_to(to_target.normalized())))
 			if angle > FIRE_ANGLE_TOLERANCE_DEG:
 				continue
 		if distance < best_distance:
 			best_distance = distance
 			best_target = candidate
 	return best_target
+
+# inbox.md #6 1번: 조준 판정에 쓰는 aim_direction을 실제 마우스 커서 방향으로
+# 갱신한다. 창 스트레치 모드(project.godot의 window/stretch/mode="canvas_items")가
+# 걸려있어도 get_global_mouse_position()은 뷰포트의 캔버스 변환을 반영한 월드
+# 좌표를 반환하므로 별도 변환이 필요 없다(Godot 4 표준 동작).
+func _update_aim_direction() -> void:
+	if DisplayServer.get_name() == "headless":
+		aim_direction = facing_direction
+	else:
+		var to_mouse := get_global_mouse_position() - global_position
+		aim_direction = to_mouse.normalized() if to_mouse.length() > 0.0 else facing_direction
+	queue_redraw()
+
+# inbox.md #6 2번: 조준선(에임 라인) 표시. 2D 게임에서 실제 어디를 조준하는지
+# 눈으로 확인할 수단이 없으면 마우스 조준이 맞는지 스스로 검증할 수 없다는
+# 지적에 따른 것 — aim_direction과 동일한 값을 그대로 그려, 판정과 시각 표시가
+# 항상 일치하게 했다. 원격(비authority) 플레이어와 헤드리스 환경에서는 그리지
+# 않는다(카메라/HUD와 동일한 이유 — 화면에 보일 일이 없거나, 애초에 그릴
+# 디스플레이가 없다).
+func _draw() -> void:
+	if not is_multiplayer_authority():
+		return
+	if DisplayServer.get_name() == "headless":
+		return
+	draw_line(Vector2.ZERO, aim_direction * FIRE_RANGE, Color(1.0, 0.2, 0.2, 0.5), 2.0)
 
 func switch_ammo_type() -> void:
 	var types: Array = AMMO_TYPE_NAMES.keys()
