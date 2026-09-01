@@ -9,6 +9,7 @@
 - 인수인계서: `/Users/tuna/projects/test_game/status.md` (최근 항목만 유지, 오래된 항목은 아래 아카이브로 이동)
 - 인수인계서 아카이브: `/Users/tuna/projects/test_game/status_archive.md` (옮겨진 과거 항목 보관용, 참고용으로만 열어봄)
 - 지시함: `/Users/tuna/projects/test_game/inbox.md`
+- QA 테스트 기록: `/Users/tuna/projects/test_game/qa_test.md` (기능 하나 만들 때마다 하는 규칙 4의 QA와는 별개로, "전체 QA를 한 번 해봐" 같은 별도 QA 요청을 받았을 때 그 결과를 날짜/시간과 함께 기록하는 파일. `status.md`와 같은 append-only 규칙 — 새 번호로 추가만 하고 기존 항목은 안 건드림. QA 중 문제를 발견하면 `inbox.md`에 지시로 등록하고 그 inbox 번호를 여기 같이 남긴다.)
 - Godot 실행파일: `godot` (PATH에 등록됨, `/opt/homebrew/bin/godot`)
 - 원격 저장소: `https://github.com/kimtuna/test_game.git` (public, branch: `main`)
 
