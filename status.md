@@ -194,3 +194,19 @@
 - 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음). `godot --headless --path . --script res://tests/tree_harvest_headless_test.gd` 실행 결과 `HEADLESS_TREE_HARVEST_TEST: PASS`(라벨 텍스트 검증 포함). `godot --headless --path . --script res://tests/boundary_headless_test.gd` 실행 결과 `HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)` — 섬 경계 충돌 로직 회귀 없음 재확인.
 - 남은 제약: 인벤토리는 세션 중 메모리에만 존재하며(저장/불러오기 없음), 자원 종류가 늘어나도 대응 가능한 구조이지만 아직 통나무 하나뿐이라 다중 자원 표시(줄바꿈 레이아웃)는 실제 화면에서 시각적으로 확인되지 않았다. design.md의 등급 시스템도 여전히 미적용.
 - 다음 할 일: design.md 로드맵상 채집/사냥/포획 단계를 계속 진행한다면, 다음 후보는 design.md가 언급한 "동물" 쪽 첫 조각(예: 도망 트리거 없이 고정된 동물 1종을 배치해 사냥/포획 상호작용의 뼈대만 우선 만들기)이 자연스럽다 — 채집(나무) 쪽은 최소 UI까지 갖춰졌으므로, 이제 사냥/포획이라는 다른 축의 첫 조각을 시작할 차례. 사람이 에디터로 직접 플레이해 인벤토리 라벨이 실제로 잘 보이는지(폰트 크기, 위치, 여러 줄일 때 겹침 여부) 확인하는 것도 권장한다. inbox.md에 새 지시가 없다면 다음 세션은 이 방향으로 진행한다.
+
+---
+
+### #18 — 2026-09-01 11:42 (자동 세션)
+
+- 계기: inbox.md에 미처리 항목 없음. status.md #17이 남긴 다음 할 일(design.md가 언급한 "동물" 쪽 첫 조각 — 도망 트리거 없이 고정된 동물 1종을 배치해 사냥/포획 상호작용의 뼈대만 우선 만들기)을 그대로 이어받음.
+- 한 일:
+  - `scripts/animal.gd` 신설: `tree.gd`와 동일한 패턴(Area2D, `player_nearby` 추적, `ui_accept`로 상호작용)을 따르되, 나무처럼 한 번에 사라지는 대신 체력(`health`, 기본 100)을 가지고 `ui_accept`를 누를 때마다 34씩 깎이는 "공격" 방식으로 구현. 체력이 0 이하가 되면 `harvested` 시그널로 자원("고기" x1)을 emit하고 `queue_free()`. 트렁크/캐노피 대신 단색 갈색(0.6, 0.4, 0.2) 사각형을 절차적 텍스처로 사용해 나무와 시각적으로 구분.
+  - 동물을 `harvestable` 그룹에 등록해, 이미 있는 `main.gd`의 인벤토리 로직(그룹의 `harvested` 시그널을 구독해 자원별 개수를 누적하고 `UI/InventoryLabel`에 표시)을 그대로 재사용 — `main.gd`는 수정하지 않음. "harvested/harvestable"이라는 이름이 채집뿐 아니라 사냥으로 얻는 자원도 포괄할 만큼 일반적이라고 판단했기 때문.
+  - `scenes/Animal.tscn` 신설: `Area2D`("Animal") + `Sprite2D` + 원형 `CollisionShape2D`(반지름 50).
+  - `scenes/Main.tscn`: `Animal` 인스턴스 1개를 섬 안쪽, Player 시작 위치(576,324)·Tree(900,500)와 겹치지 않는 (300,450)에 배치.
+  - design.md가 명시한 포획(마취총, 체력 8% 미만 조건)과 도주 AI(발소리/시야/피격 감지)는 이번 세션 범위에서 의도적으로 제외했다 — 포획은 별도 무기/아이템 시스템이, 도주 AI는 감지/이동 로직이 각각 필요해 "기능 하나만"(규칙 4)을 넘어서기 때문. status.md #16이 "고정된 동물 1종 배치"를 제안한 것과 같은 이유로, 이번 조각은 사냥(반복 공격 → 처치 → 자원 획득)까지만 다룬다.
+  - `tests/animal_hunt_headless_test.gd` 신설: `Main.tscn`을 인스턴스화해 (1) 범위 밖에서 `ui_accept`를 눌러도 체력이 줄지 않는지, (2) Player가 범위 안에 들어가면 `player_nearby`가 설정되는지, (3) 체력이 0 이하가 될 때까지(3회) 반복 공격하면 실제로 동물이 사라지고 인벤토리 라벨이 "고기: 1"이 되는지 검증.
+- 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음). `godot --headless --path . --script res://tests/animal_hunt_headless_test.gd` 실행 결과 `HEADLESS_ANIMAL_HUNT_TEST: PASS (hits=3)`. 기존 `tests/tree_harvest_headless_test.gd`(`HEADLESS_TREE_HARVEST_TEST: PASS`), `tests/boundary_headless_test.gd`(`HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)`)도 재실행해 회귀 없음을 확인.
+- 남은 제약: 동물은 완전히 고정되어 있고(이동/애니메이션 없음), 사냥 판정도 "가까이서 아무 키나 반복 누르면 죽는다"는 매우 단순한 형태다. 포획 분기(체력 8% 미만 + 마취총)가 없어 design.md의 "동물을 죽일 수도, 포획할 수도 있다"는 아직 절반(죽이기)만 구현된 상태. 화면에 동물 체력을 보여주는 UI도 없어(콘솔 출력뿐) 플레이어가 몇 대 더 때려야 하는지 알 수 없다.
+- 다음 할 일: 사냥/포획 축을 계속 이어가려면 다음으로 작은 단위 후보는 (1) 체력을 8% 미만으로 낮췄을 때 다른 입력(예: 별도 액션 또는 조건)으로 "포획"과 "사냥(처치)"을 구분하는 최소 분기 추가, 또는 (2) 화면에 동물 체력을 보여주는 간단한 UI(예: 체력바 또는 숫자)다. 도주 AI(발소리/시야/피격 감지)는 별도의 더 큰 작업이므로 서두르지 않는다. inbox.md에 새 지시가 없다면 다음 세션은 규칙 4(기능 하나만)에 따라 이 중 하나를 골라 진행한다.
