@@ -12,6 +12,10 @@
 - Godot 실행파일: `godot` (PATH에 등록됨, `/opt/homebrew/bin/godot`)
 - 원격 저장소: `https://github.com/kimtuna/test_game.git` (public, branch: `main`)
 
+## 비밀값(API 키 등) — 반드시 지킬 것
+
+이 저장소는 **public** GitHub 저장소다. API 키 같은 비밀값을 커밋되는 어떤 파일에도 **절대 직접 적지 않는다** (코드, 주석, 문서, status.md/inbox.md 포함 — 예시로라도 실제 키 값을 적지 않는다). 필요한 비밀값은 `.harness/secrets.env`(git에 안 올라가는 로컬 전용 파일)에 있고, 하네스 세션 실행 시 이미 환경변수로 주어져 있다 — 예: `PIXELLAB_API_KEY`. 코드에서는 환경변수로만 참조한다 (Python: `os.environ["PIXELLAB_API_KEY"]`, shell: `$PIXELLAB_API_KEY`). 새로운 외부 서비스 키가 필요한데 없다면, 코드로 만들어내려 하지 말고 `status.md`에 "이런 키가 필요하다"고 남긴 뒤 그 부분은 건너뛴다. (근거: 커밋 하나에라도 키가 들어가면 그 순간 전 세계에 공개된다 — git 히스토리에서 지우는 것도 매우 번거롭고, 이미 크롤링됐으면 지워도 소용없다.)
+
 ## 세션 시작 시 반드시 순서대로 읽기
 
 1. `design.md` — 무엇을 만드는가. 초기 기획이며 거의 바뀌지 않는다. 여기서 게임의 목적과 범위를 벗어나지 않는다.
