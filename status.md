@@ -403,3 +403,28 @@
 
 > [!IMPORTANT]
 > HARNESS_STOP: inbox.md에 미처리 항목이 없다(#1~#13 전부 처리 완료, status.md #75와 동일한 근거). 새 기능을 스스로 고르지 않고 자동 루프를 다시 멈춘다.
+
+---
+
+### #77 — 2026-09-02 06:36 (fire 입력 이중 소비 헤드리스 테스트 플레이키니스 근본 수정, inbox #14 처리)
+
+요약: `inbox.md` #14 지시대로, `animal_hunt`/`animal_capture` 헤드리스 테스트가 여러 세션째(#54/#66/#73/#75) 간헐적으로 실패하던 근본 원인을 진단 스크립트로 직접 재현해 규명하고 고쳤다. 원인은 `Input.action_press()` 직후 `await process_frame`(idle 프레임)으로 기다리다가, 같은 테스트 안에서 앞서 `await physics_frame`으로 대기한 구간(추격 루프 등)과 섞이면서 idle/물리 프레임 카운터가 서로 어긋나는 것이었다 — 이 어긋남 때문에 엔진이 한 idle 이터레이션 안에서 물리 스텝을 몰아서 두 번 처리하는 경우가 생기고, `is_action_just_pressed`가 그 두 스텝 모두에서 참이 되어 클릭 한 번이 데미지 두 번으로 소비됐다(재현: 1회 공격 후 체력이 69/100이 아니라 38/100으로 찍힘). 같은 패턴(process_frame으로 press/release를 감싸면서 physics_frame 대기와 섞는 것)을 쓰는 다른 8개 테스트 파일도 함께 고쳤다.
+
+- 계기: `inbox.md` #14 — `qa_test.md #1`(사람이 직접 실행한 전체 QA)에서 재확인된, 4번째 세션째 미루어진 테스트 플레이키니스를 근본 원인에 맞게 고치라는 지시.
+- 한 일:
+  - 먼저 `godot --headless`로 진단 스크립트(`tests/_tmp_input_probe*.gd`, 확인 후 삭제)를 작성해 실측했다. `Input.action_press()` 후 `await process_frame`으로 기다리는 동안 실제로 소요되는 물리 프레임 수(`Engine.get_physics_frames()` 델타)가 0~5 사이로 들쭉날쭉함을 먼저 확인했고, 이어서 실제 `animal_hunt_headless_test.gd`를 반복 실행해 "1회 공격인데 69가 아니라 38로 찍힘"(공격이 두 번 소비됨)을 직접 재현했다 — `push_error` 로그와 `animal_hunt` 첫 히트에서 69/100을 건너뛰고 곧장 38/100으로 떨어지는 것을 확인.
+  - `tests/test_input_helper.gd`를 새로 만들어, press → `await tree.physics_frame` → release → `await tree.physics_frame`만 쓰는 `simulate_click(tree, action)`을 정의했다(idle 프레임을 아예 섞지 않아 어긋남 자체가 발생하지 않는다 — 게임 로직이 전부 `_physics_process`에서 동작하므로 물리 프레임 기준으로 관찰/소비 시점을 통일하면 충분하다).
+  - `animal_hunt_headless_test.gd`/`animal_capture_headless_test.gd`(inbox #14가 직접 지목)를 이 헬퍼를 쓰도록 바꾼 뒤, 각각 10회/6회 연속 실행해 전부 통과함을 확인(이전에는 반복 실행 시 절반 가까이 실패했었다).
+  - "같은 패턴을 쓰는 다른 테스트가 있다면 함께" 처리하라는 지시에 따라, `grep`으로 `action_press`/`await process_frame` 패턴을 쓰는 파일을 전수 조사했다. `grade_headless_test.gd`, `equipment_gate_headless_test.gd`, `mouse_hunt_headless_test.gd`, `grade_reward_headless_test.gd`, `animal_ranged_hunt_headless_test.gd`, `fish_harvest_headless_test.gd`, `tree_harvest_headless_test.gd`, `animal_facing_headless_test.gd` 8개가 동일 패턴(추격/체이싱에 `physics_frame`을 쓰면서 press/release는 `process_frame`을 쓰는 조합)이었고, Python 정규식으로 일괄 치환해 전부 `TestInputHelper.simulate_click()`을 쓰도록 바꿨다(`mouse_hunt`의 `switch_ammo`/`reload`처럼 `physics_frame`+`process_frame`을 이중으로 섞은 변형 패턴도 함께 처리).
+  - `animal_sound_flee_headless_test.gd`처럼 `action_press`/`action_release`를 쓰지만 처음부터 `physics_frame`만 쓰고 `process_frame`과 섞이지 않는 파일은 이 버그의 영향을 받지 않으므로 손대지 않았다(범위를 정확히 원인에 맞춰 한정).
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음.
+  - 수정한 10개 파일 전부 개별 실행 통과. 특히 `animal_hunt`/`animal_capture`는 각 10회/6회 연속 재실행해도 전부 PASS(이전엔 반복 시 자주 FAIL).
+  - 이번 변경이 테스트 인프라 패턴 하나를 여러 시스템(동물/나무/물고기/장비/등급/마우스입력)에 걸쳐 동시에 건드리는 광범위한 수정이라 판단해, CLAUDE.md 규칙 4의 예외에 따라 `tests/` 안의 헤드리스 테스트 34개 전체를 실행했다 — 전부 PASS, 회귀 없음(네트워크/카메라 authority 2-프로세스 테스트 포함).
+  - 순수 테스트 인프라 변경이라 눈으로 볼 게임플레이 변화가 없어(CLAUDE.md 규칙 4의 예외), 실제 창을 띄우는 시각 QA는 생략했다.
+  - 진단에 썼던 임시 스크립트(`tests/_tmp_input_probe.gd`, `tests/_tmp_input_probe2.gd`)는 확인 후 삭제해 커밋에 포함되지 않았다.
+- 남은 제약: 이번 수정은 테스트 코드(`tests/`)에만 적용됐고, 실제 게임 코드(`scripts/player.gd`의 `_physics_process`가 `is_action_just_pressed("fire")`를 읽는 방식)는 건드리지 않았다 — 실제 플레이(마우스 클릭)는 OS 입력 이벤트를 통해 들어오므로 이 헤드리스 시뮬레이션 특유의 문제이고, 실제 플레이에서 이중 발사가 재현된 적은 없다. `project.godot`의 `[display]` 섹션이 에디터/실행기에 의해 반복적으로 유실되는 현상(status.md #72/#74/#76)은 여전히 미해결이나 실사용 영향 없음. 그 외 원격 피어 애니메이션 미동기화, 나무/식물/물고기가 절차적 단색 사각형, 아이템 줍기/제작 등도 그대로 남아있다.
+- 다음 할 일: `inbox.md` #14가 처리 완료됐고 다른 미처리 항목은 없다. 규칙 7에 따라, 위 "남은 제약"에 남은 항목들은 세션이 스스로 고르지 않고 후보로만 남긴다. 사용자가 플레이해보고 `inbox.md`에 새 지시를 남겨야 다음 실질적 작업이 시작된다.
+
+> [!IMPORTANT]
+> HARNESS_STOP: inbox.md의 유일한 미처리 항목(#14)을 이번 세션에서 처리 완료했다. 다른 미처리 지시가 없어 스스로 다음 작업을 고르지 않고 자동 루프를 멈춘다.
