@@ -297,3 +297,25 @@
 > 재확인 결과: `inventory_headless_test`(PASS)를 포함해 위 확인 항목 전체가 정상 통과했다.
 - 남은 제약: 인벤토리는 열려 있어도 플레이어 이동/발사를 막지 않는다(design.md/inbox가 이동 잠금을 요구하지 않았고, 새로 잠금 로직을 추가하면 규칙 4를 넘어서는 별개의 결정이 된다고 판단). 슬롯 안에는 아이콘 없이 텍스트(이름+개수)만 표시한다(아트 리소스 범위 밖). 9칸을 넘겼을 때 자원은 그냥 버려진다 — 드롭/교체 UI는 없다. `inbox.md` #6의 4번(장비 슬롯 7종)·5번(핫바 1~5)은 아직 미착수.
 - 다음 할 일: 다음 세션은 `inbox.md` #6의 4번(모자/상의/하의/신발/귀걸이/반지/가방 7종 장비 슬롯)부터 이어받을 것을 권장한다. `inbox.md` #6에 아직 4~5번이 남아있으므로 규칙 7에 따라 `HARNESS_STOP`을 남기지 않고 다음 세션이 계속 이어간다.
+
+---
+
+### #56 — 2026-09-02 03:24 (자동 세션)
+
+- 계기: `inbox.md` #6(부분 처리 중)을 이어받았다 — status.md #55가 다음으로 권장한 4번(모자/상의/하의/신발/귀걸이/반지/가방 7종 장비 슬롯)을 규칙 4(기능 하나만)에 따라 이번 세션의 조각으로 골랐다. 5번(핫바 1~5)은 이번에 손대지 않았다 — inbox #6 자체가 "여러 세션에 걸쳐 순서대로 처리"를 명시했다.
+- 참고: 이번 세션 시작 시 `CLAUDE.md`에 이미 반영돼 있던(이 세션이 작성하지 않음) 규칙 하나를 확인했다 — `status.md`/`inbox.md` 제목 괄호 안에는 항상 정확히 "(자동 세션)"만 적고, "(수동 실행, ...)" 같은 확인 불가능한 표현은 쓰지 않는다(세션 스스로는 이 실행이 사람이 방금 시작한 것인지 루프의 다음 반복인지 구별할 방법이 없기 때문). 이번 항목부터 그 형식을 따른다.
+- 한 일:
+  - `scripts/player.gd`: 기존 `equipment` 딕셔너리("tool"/"weapon"/"rod"/"sickle", 상호작용에 실제로 쓰이는 "도구" 개념)와 별개로 `wearables` 딕셔너리("hat"/"top"/"bottom"/"shoes"/"earring"/"ring"/"bag", "복장/악세서리" 개념)를 추가했다. `WEARABLE_SLOTS` 상수(7개 영문 키, 순서 고정)와 `equip_wearable(slot, item_name)`/`unequip_wearable(slot)`/`get_wearable(slot)`을 뒀다. 기본값은 7슬롯 전부 빈 문자열이다 — "기본 코디 제공"은 이미 `OUTFIT_COLOR`로 그리는 하의 색으로 충족되어 있고(player.gd 기존 주석), 아직 옷/장신구를 얻는 방법(상점/제작/줍기)이 게임 안에 전혀 없어(범위 밖, inbox #4 5번) 기본으로 채울 아이템 자체가 없기 때문이다.
+  - `scenes/Main.tscn`의 `InventoryOverlay`를 개편했다 — 기존에는 `InventoryPanel` 아래 `SlotGrid`(9칸)만 있었는데, 그 사이에 `Body`(HBoxContainer)를 끼워넣고 왼쪽에 `WearableColumn`(7개 Panel+Label, 모자~가방 순서)을, 오른쪽에 기존 `SlotGrid`를 나란히 배치했다. 새 키 바인딩을 만들지 않고 기존 인벤토리(E) 화면 안에 장비 슬롯을 포함시킨 이유: (1) inbox #6에 장비 슬롯을 여는 별도 키가 명시돼 있지 않았고, (2) inbox #6 3번이 이미 "마인크래프트 인벤토리를 참고"하라고 지시했는데 마인크래프트의 인벤토리 화면 자체가 그리드와 방어구 슬롯을 한 화면에 같이 보여주는 구조라 참고 지시와도 맞는다. `InventoryPanel`의 가로 폭을 320→460으로 늘려 새 칸이 들어갈 공간을 확보했다.
+  - `scripts/main.gd`: `WEARABLE_SLOT_NAMES`(영문 키 -> 한글 라벨, `player.WEARABLE_SLOTS`와 순서 동일) 상수와 `_update_wearable_slots()`를 추가해 E로 인벤토리를 열 때 `_update_inventory_grid()`와 함께 호출한다. `wearable_slot_column`(`@onready`) 참조도 추가했다. `inventory_slot_grid`의 노드 경로가 씬 구조 변경으로 `.../InventoryPanel/SlotGrid`에서 `.../InventoryPanel/Body/SlotGrid`로 바뀌어 함께 수정했다.
+  - 저장/불러오기(`_save_slot`/`_apply_slot_data`)에 `wearables`를 추가해, 착용 상태도 인벤토리/장비 등급과 마찬가지로 슬롯별로 영속화되게 했다.
+  - 신규 헤드리스 테스트 `tests/equipment_wearable_headless_test.gd`: (1) 기본 상태에서 7슬롯이 전부 비어있고 `WearableColumn` 자식이 7개인지, (2) `equip_wearable`/`unequip_wearable`이 인벤토리 오버레이 UI에 "이름: 아이템"/"이름: -"로 즉시 반영되는지, (3) `save_load_headless_test.gd`와 동일한 절차(인스턴스를 완전히 없애고 새로 만들어 디스크에서 실제로 복원되는지 확인)로 착용 상태가 슬롯 저장/불러오기에 영속화되는지 확인한다. 아직 옷을 얻는 게임 내 방법이 없어 `equipment_upgrade_headless_test.gd`와 동일하게 `equip_wearable()`을 테스트가 직접 호출해 상황을 흉내냈다.
+- 확인:
+  - `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음).
+  - 이번 변경과 직접 관련된 테스트만 재실행(규칙 4 QA 지침): `equipment_wearable_headless_test`(`PASS`, 신규), `inventory_headless_test`(`PASS`, `SlotGrid` 노드 경로 변경 반영 후), `save_load_headless_test`(`PASS`), `pause_menu_headless_test`(`PASS`, 같은 `_unhandled_input` 오버레이 체인을 다시 확인), `equipment_upgrade_headless_test`(`PASS`, 기존 `equipment`(도구) 강화 경로가 새 `wearables` 딕셔너리와 이름이 겹치지 않아 그대로 동작하는지 확인) 모두 통과. `ps aux`로 확인한 결과 남은 godot 프로세스는 없었다.
+
+> [!CAUTION]
+> 신규 테스트 작성 중 헤드리스 테스트에서 처음에는 실패(FAIL)가 났다 — 슬롯 1을 새로 골라 색을 정하면(코어키퍼 슬롯 흐름) 곧바로 튜토리얼 오버레이가 뜨는데, 테스트가 이를 닫지 않고 바로 E를 눌러 인벤토리를 열려고 했다. `main.gd`의 `_unhandled_input`은 튜토리얼 오버레이가 열려 있으면 어떤 키를 눌러도 그 오버레이만 닫고 다른 분기(E로 인벤토리 열기 등)는 실행하지 않으므로, "모자를 착용해도 UI에 반영되지 않음(E가 사실 튜토리얼을 닫는 데 소비됨)"으로 나타났다. `inventory_headless_test.gd`가 이미 쓰던 패턴(슬롯 선택 → 색 선택 → 스페이스로 튜토리얼 닫기)을 그대로 따라 커스터마이징 직후 스페이스바 입력을 추가해 고쳤다 — `main.gd`/`player.gd` 로직 자체의 버그는 아니었다.
+> 재확인 결과: `equipment_wearable_headless_test`(PASS)를 포함해 위 확인 항목 전체가 정상 통과했다.
+- 남은 제약: 7개 착용형 슬롯은 데이터 구조와 UI 표시(인벤토리 화면 안)만 갖춰졌다 — 아직 옷/장신구를 얻는 방법(상점/제작/줍기)도, 인벤토리에서 클릭/드래그로 장착하는 상호작용도 없다(범위 밖, inbox #4 5번이 제작/줍기 자체를 미룸). 캐릭터 스프라이트에 착용한 아이템이 시각적으로 반영되지도 않는다(아트 리소스 범위 밖). `inbox.md` #6의 5번(핫바 1~5)은 아직 미착수.
+- 다음 할 일: 다음 세션은 `inbox.md` #6의 5번(휴대 장비 핫바, 숫자 1~5, 인벤토리 9칸과 별도 데이터 구조)부터 이어받을 것을 권장한다. `inbox.md` #6에 아직 5번이 남아있으므로 규칙 7에 따라 `HARNESS_STOP`을 남기지 않는다.
