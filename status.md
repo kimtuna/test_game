@@ -229,3 +229,26 @@
 > HARNESS_STOP: inbox.md에 미처리 항목 없음 + 규칙 7 재정의(자체 후보 계속 실행 금지) 반영 — 자동 루프를 여기서 멈춘다.
 
 - 다음 할 일 (자동 세션 재개 없음 — 사용자가 직접 재개해야 함): 사용자가 직접 플레이해보고 원하는 것을 `inbox.md`에 새 항목으로 남긴 뒤 `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kdw240.testgame.harness.plist`로 데몬을 다시 켜면, 다음 세션이 그 지시만 처리하고 다시 멈춘다. `status.md` #50/#51이 남긴 "포획한 동물의 실제 활용" 등은 세션이 임의로 진행하지 않으므로, 원하면 `inbox.md`로 명시적으로 지시해야 한다.
+
+---
+
+### #53 — 2026-09-02 02:48 (수동 실행, 사용자가 하네스 사이클 1회를 직접 요청)
+
+- 계기: `inbox.md` #5(미처리)를 이어받았다 — "총인데 직접 다가가서 때려야 한다"는 지적에 따라 동물 사냥 발사 판정을 근접(`player_nearby`, 반경 50 Area2D)에서 실제 사거리 기반으로 바꾸는 작업.
+- 한 일:
+  - 판정 주체를 `animal.gd`(각 동물이 `_process`에서 `player_nearby`를 폴링)에서 `player.gd`로 옮겼다. `player.gd`에 `FIRE_RANGE`(350px)와 `POINT_BLANK_DISTANCE`(50px, 기존 근접 반경과 동일)를 추가하고, `_physics_process`에서 `fire`가 눌리면 `_find_fire_target()`으로 "capturable" 그룹(동물) 중 사거리 안 + 조준 방향(`facing_direction`) `FIRE_ANGLE_TOLERANCE_DEG`(25도) 이내에서 가장 가까운 대상을 찾아 그 동물의 새 공개 메서드 `handle_fire(shooter)`를 직접 호출한다. `POINT_BLANK_DISTANCE`보다 가까우면 조준 방향과 무관하게 맞는다(완전히 붙어있을 때 어느 쪽을 보고 있든 맞는 게 상식적이라는 판단).
+  - `facing_direction`은 마우스 커서 방향이 아니라 "현재 이동 방향"으로 정했다 — inbox #5가 "마우스 커서 방향 또는 현재 조준 방향" 둘 다 허용했는데, 이 저장소는 헤드리스 테스트로만 자동 QA를 하고 실제 마우스 위치를 흉내낼 수단이 없어(다른 입력들도 이미 이 이유로 폴링 방식을 씀, player.gd 기존 주석 참고) 마우스 기반으로 하면 자동 검증이 불가능해지기 때문이다.
+  - `animal.gd`: `_attack()`/`_try_capture()`가 암묵적으로 쓰던 `player_nearby`를 명시적 `shooter` 매개변수로 바꿔 어느 플레이어가 쐈는지 `player.gd`가 골라 넘겨주도록 했다. 기존 게이트 로직(장비 유무, 등급 체크, 8% 미만 포획 조건)과 탄약 소비 순서는 전혀 바꾸지 않았다 — inbox #5가 명시적으로 "무엇을 맞힐 수 있는가"만 바꾸라고 했다. `player_nearby` 자체와 그 Area2D는 지우지 않았다(점블랭크 판정과 기존 헤드리스 테스트의 근접 확인 용도로 계속 쓰임).
+  - 신규 헤드리스 테스트 `tests/animal_ranged_hunt_headless_test.gd`: 기존 테스트들은 전부 플레이어를 동물과 정확히 같은 좌표(거리 0, 점블랭크 안)에 두고 발사하므로 이번에 새로 생긴 "사거리 안 + 조준 방향이 맞아야 한다"는 조건 자체는 검증하지 못했다. 이 테스트는 `player.facing_direction`을 테스트가 직접 설정해(마우스 시뮬레이션 없이 조준 방향을 결정론적으로 통제) (1) 사거리(350) 밖 + 올바른 조준 → 빗나감, (2) 사거리 안(200px) + 반대 방향 조준 → 빗나감, (3) 사거리 안(200px) + 올바른 조준 → 명중을 확인한다.
+
+> [!CAUTION]
+> 새 테스트를 작성하는 과정에서 두 가지 버그를 발견해 QA 단계에서 고쳤다.
+> 1) `Vector2.angle_to()`가 반환하는 부호 있는 각도(-180~180)를 `abs()` 없이 그대로 `> FIRE_ANGLE_TOLERANCE_DEG`와 비교해, 정반대 방향을 조준해도(부호가 -180으로 나오는 부동소수점 분기 때문에) 맞아버리는 버그가 있었다. `absf()`로 감싸서 고쳤다.
+> 2) `fire`/`switch_ammo`/`reload`를 `elif` 체인으로 묶었더니, `mouse_hunt_headless_test`에서 `reload`가 전혀 호출되지 않고 탄약이 0에 머무는 회귀가 발생했다 — 원인은 헤드리스 테스트가 `fire`를 누른 뒉 `physics_frame`을 기다리지 않고 바로 `process_frame`만 기다려서, "방금 눌림" 상태가 물리 프레임에 아직 소비되지 않은 채 다음 `reload` 물리 프레임까지 남아있었고, `elif` 체인이 그 stale한 `fire` 분기를 먼저 타면서 `reload` 분기 자체를 가로챈 것이었다. 세 액션은 논리적으로도 서로 배타적일 필요가 없으므로 독립된 `if`문 세 개로 분리해 고쳤다.
+> 재확인 결과: `animal_ranged_hunt_headless_test`(신규, PASS), `mouse_hunt_headless_test`(PASS)를 포함해 아래 확인 항목 전체가 정상 통과했다.
+- 확인: `godot --headless --path . --quit` 에러 없음. 이번 변경과 직접 관련된 테스트만 재실행(규칙 4 QA 지침): `animal_ranged_hunt_headless_test`(`PASS`, 신규), `animal_hunt_headless_test`(`PASS`), `animal_capture_headless_test`(`PASS`), `equipment_gate_headless_test`(`PASS`), `grade_headless_test`(`PASS`), `grade_reward_headless_test`(`PASS`), `mouse_hunt_headless_test`(`PASS`), `animal_flee_headless_test`(`PASS`, `_attack`이 이제 `shooter`를 받아 `_start_fleeing(shooter)`로 넘기는 경로라 도주 방향 계산이 깨지지 않았는지 확인차 포함) 모두 통과. `ps aux`로 확인한 결과 이번 세션이 새로 띄운 채 남은 godot 프로세스는 없었다.
+- 남은 제약: `FIRE_RANGE`(350)/`POINT_BLANK_DISTANCE`(50)/`FIRE_ANGLE_TOLERANCE_DEG`(25도) 수치는 design.md에 명시되지 않은 밸런스 값이라 하네스가 상식적으로 정한 기본값이다 — 총기 사거리 체감이나 조준 관용도는 실제 플레이해보고 조정이 필요할 수 있다. `facing_direction`은 이동 입력 기반이라, 제자리에 멈춰 서서 이동 없이 여러 방향을 조준하는 것은 아직 불가능하다(직전에 이동한 방향을 계속 조준 방향으로 유지) — 실제 마우스 조준 UI/레티클은 범위 밖으로 남겨뒀다. 나무/물고기/식물(Tree/Fish/Plant)의 채집(`ui_accept`, 근접)은 이번 변경 대상이 아니라 그대로다.
+- 다음 할 일: `inbox.md`에 새 지시가 없다면(현재 #1~#5 모두 처리 완료), CLAUDE.md 규칙 7에 따라 세션이 스스로 다음 후보를 골라 진행하지 않고 여기서 멈춘다. 다음에 참고할 후보(직접 코드로 만들지는 않음): 실제 마우스 커서 방향 조준으로 전환(레티클 UI 포함), 포획한 동물의 실제 활용, 사거리/조준 관용도 수치 밸런싱.
+
+> [!IMPORTANT]
+> HARNESS_STOP: inbox.md #5까지 모두 처리 완료 + 미처리 항목 없음 — 자동 루프를 여기서 멈춘다.
