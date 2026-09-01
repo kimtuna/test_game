@@ -268,3 +268,30 @@
 
 - 남은 제약: 현재 게임에 동물 종류가 사슴 하나뿐이라(`scenes/Main.tscn`에 Animal 인스턴스 1개) `animal.gd`의 텍스처 경로를 사슴 전용으로 하드코딩했다 — 다른 동물 종류가 추가되면 텍스처 셋을 파라미터화(예: `grade`나 별도 `species` 필드로 분기)해야 한다. 원격(비authority) 멀티플레이어 인스턴스에서 동물 애니메이션이 동기화되는지는 이번 세션에서 확인하지 않았다(플레이어 걷기 애니메이션도 status.md #66에서 로컬 전용으로 남아있던 것과 동일한 제약일 가능성이 높다 — 동물은 서버 authority가 이동을 계산하므로 클라이언트에서도 `is_fleeing`이 동기화 값이라면 애니메이션이 자연히 따라올 수 있으나 검증 전이다). 나무/식물/물고기는 여전히 절차적 단색 사각형이다. status.md #57/#58/#61/#66이 남긴 기존 미해결 사항(아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스, 머리 종류 색상 선택 부재)도 그대로 남아있다.
 - 다음 할 일: `inbox.md` #9(1~5번)가 이번 세션으로 전부 처리 완료됐다. `inbox.md`에는 아직 #10(해상도 설정 UI — 설정 메뉴에 해상도 선택 추가, `project.godot` 정적 설정 대신 런타임 코드로 창 크기 지정, 저장 시스템에 반영)이 미처리로 남아있다. 다음 세션은 `inbox.md` #10을 이어받는다. 미처리 항목이 남아있으므로 규칙 7의 `HARNESS_STOP` 조건에 해당하지 않는다 — 이번 세션은 멈추지 않고 정상 종료한다.
+
+---
+
+### #71 — 2026-09-02 05:10 (해상도 설정 UI + 런타임 창 크기 지정 + PvP 공정성 조건, inbox #10·#11 처리 — inbox 전체 처리 완료)
+
+요약: `inbox.md` #10(해상도 설정 UI + 런타임 창 크기 지정)을 처리했다. `GameSettings` 오토로드를 새로 추가해 4종 해상도 중 하나를 `get_window().size`로 런타임에 적용하고 `user://settings.cfg`에 저장하게 했고, 메인 메뉴 설정 패널에 `OptionButton`을 추가했다. 작업 도중 `inbox.md`에 #11(같은 해상도 설정에 대한 PvP 공정성 추가 조건 — 화면비를 섞지 말고 `window/stretch/aspect`를 명시적으로 `"keep"`으로 고정할 것)이 새로 추가된 것을 뒤늦게 발견해 같은 세션에서 함께 반영했다(#10 구현이 아직 커밋 전이라 규칙 4 위반 없이 이어서 처리 가능하다고 판단). QA 중 헤드리스 SceneTree 테스트 스크립트에서는 오토로드를 `GameSettings`라는 전역 식별자로 바로 참조할 수 없고 `root.get_node("GameSettings")`로 찾아야 한다는 걸 새로 확인했다. 이번 세션으로 `inbox.md`의 모든 항목(#1~#11)이 처리 완료 상태가 되어, 규칙 7에 따라 자동 루프를 멈춘다.
+
+- 계기: `status.md` #70이 다음 세션은 `inbox.md` #10을 이어받으라고 명시했다. `inbox.md` #10은 (a) 설정 메뉴에 해상도 선택 UI 추가, (b) 창 크기를 `project.godot` 정적 설정이 아니라 런타임 코드로 지정, (c) 선택한 해상도를 저장 시스템에 포함 — 세 가지를 요구했다. #10 구현을 마치고 기록을 남기려던 중 `inbox.md`를 다시 열어보니 그 사이 사용자가 #11(PvP 공정성 조건)을 추가해둔 상태였다 — 아직 이번 세션의 어떤 것도 커밋되지 않은 시점이라, 별도 세션으로 미루지 않고 바로 이어서 반영했다.
+- 한 일:
+  - `scripts/game_settings.gd`를 새로 만들어 오토로드로 등록(`project.godot` `[autoload]`에 `GameSettings="*res://scripts/game_settings.gd"` 추가). `RESOLUTIONS` 배열(800x450 / 1152x648 / 1600x900 / 1920x1080, 인덱스 1=1152x648을 기본값으로 삼음 — Godot 4가 `window/size` 미지정 시 쓰는 기본 창 크기와 동일해 기존 체감과 어긋나지 않음), `set_resolution(index)`(창 크기 적용 + 저장), `_load_settings()`/`_save_settings()`(`ConfigFile`로 `user://settings.cfg` 읽기/쓰기)를 구현했다. 헤드리스에서는 `DisplayServer.get_name() == "headless"`일 때 창 크기 적용을 건너뛴다(기존 `main_menu.gd`의 전체화면 체크와 동일한 패턴).
+  - 해상도 저장 위치는 **슬롯별이 아니라 전역**(`user://settings.cfg`)으로 판단했다 — 해상도는 캐릭터별 속성이 아니라 디스플레이/기기 설정이라, 슬롯을 바꿔도 유지되는 게 자연스럽다고 봤다. `inbox.md` #10 3번이 "슬롯별 또는 전역, 하네스가 적절히 판단"이라고 명시해 이 판단은 지시 범위 안이다.
+  - `scenes/MainMenu.tscn`의 `SettingsPanel`에 `ResolutionLabel`(라벨) + `ResolutionOption`(`OptionButton`)을 추가하고 `item_selected` 시그널을 `_on_resolution_selected`에 연결.
+  - `scripts/main_menu.gd`: `_ready()`에서 `GameSettings.RESOLUTIONS` 항목들을 `resolution_option`에 채우고 현재 `GameSettings.resolution_index`를 선택 상태로 맞춘다. `_on_resolution_selected(index)`가 `GameSettings.set_resolution(index)`를 호출해 즉시 반영 + 저장한다.
+  - **`inbox.md` #11(PvP 공정성) 반영**: `project.godot`에 `window/stretch/aspect="keep"`을 명시적으로 추가했다(기존에는 값 자체가 비어있었다 — Godot 4의 실제 기본값도 "keep"이라 동작은 바뀌지 않지만, 에디터가 프로젝트 설정을 건드릴 때 이 값이 조용히 다른 값으로 바뀌어도 알아채기 어려운 "값이 아예 없는" 상태보다, 명시적으로 적혀있는 편이 다음 세션들이 실수로 지우거나 바꾸는 걸 막는다). `GameSettings.RESOLUTIONS`의 4개 해상도(800x450/1152x648/1600x900/1920x1080)를 다시 계산해보니 전부 정확히 16:9(1.7778)로, 이미 화면비가 통일되어 있었다 — 처음 목록을 정할 때 `inbox.md` #10이 예시로 준 네 값을 그대로 썼는데 결과적으로 전부 16:9였다(우연이 아니라 흔한 와이드스크린 해상도들이라 자연히 16:9로 모인 것으로 보인다). 다만 다음에 해상도를 추가하는 세션이 이 제약을 놓치지 않도록 `game_settings.gd`의 `RESOLUTIONS` 선언 바로 위에 "새 해상도는 반드시 16:9만 추가할 것" 주석을 남겼다. `window/stretch/mode="canvas_items"` + `aspect="keep"` 조합이면 창 크기가 달라져도 카메라가 보여주는 게임 월드의 범위(시야)는 동일하고, 실제 화면에 그려지는 배율/레터박스 여부만 달라진다 — 즉 "해상도 선택은 순수 화면 크기 취향이고 시야/공정성에는 영향 없음"이 보장된다(inbox #11 3번이 요구한 근거 기록).
+- 확인:
+  - `godot --headless --path . --quit` 통과(aspect 설정 추가 이후 재확인 포함).
+  - 이번 변경과 직접 관련된 `tests/mainmenu_headless_test.gd`에 해상도 드롭다운 검증(초기 항목 수/선택 인덱스가 `GameSettings`와 일치하는지, 항목 선택 시 `GameSettings.resolution_index`가 실제로 갱신되는지)을 추가하고 재실행 — PASS.
+
+> [!CAUTION]
+> 새로 추가한 `tests/mainmenu_headless_test.gd`의 해상도 검증 코드에서 오토로드를 `GameSettings.RESOLUTIONS...`처럼 전역 식별자로 바로 참조했더니 `SCRIPT ERROR: Compile Error: Identifier not found: GameSettings`가 났다 — `godot --script`로 직접 실행하는 `SceneTree` 테스트 스크립트에서는 오토로드가 전역 식별자로 바인딩되지 않고(반면 `scenes/MainMenu.tscn`에 연결된 `main_menu.gd`처럼 일반 씬 스크립트에서는 문제없이 동작), `NetworkManager`를 쓰는 기존 네트워크 테스트들도 전부 `root.get_node("NetworkManager")` 패턴을 쓰고 있는 걸 뒤늦게 확인했다. 같은 패턴으로 `root.get_node("GameSettings")`를 지역 변수에 담아 참조하도록 고치니 통과했다(`HEADLESS_MAINMENU_TEST: PASS`). 새 오토로드를 헤드리스 `SceneTree` 스크립트 테스트에서 참조할 때는 처음부터 `root.get_node("<AutoloadName>")` 패턴을 써야 한다는 걸 기록해둔다.
+
+- 남은 제약: 해상도 변경이 실제 창에 반영되는지는 헤드리스 환경 특성상 시각적으로 확인하지 못했다(코드 경로는 기존 전체화면 토글과 동일한 `DisplayServer` API를 쓰므로 동작할 것으로 판단하지만, 사람이 직접 에디터/빌드로 플레이해보며 확인이 필요하다). 전체화면 상태에서 해상도를 바꾸면 어떻게 되는지(예: 전체화면 해제 여부)는 별도로 다루지 않았다. `window/stretch/aspect="keep"`이 실제로 레터박스를 만드는지, PvP가 실제로 구현될 때 시야가 정말 동일한지도 시각적으로는 미검증이다(코드/설정상의 근거만 남김). status.md #57/#58/#61/#66/#69/#70이 남긴 기존 미해결 사항(아이템 줍기/제작, 핫바-상호작용 연결, `animal_hunt`/`animal_capture` fire 입력 이중 소비 플레이키니스, 원격 피어 애니메이션 미동기화, 나무/식물/물고기가 여전히 절차적 단색 사각형)도 그대로 남아있다.
+- 다음 할 일: `inbox.md`의 모든 항목(#1~#11)이 이번 세션으로 처리 완료됐다. design.md 로드맵(캐릭터 이동/카메라 → 섬 기본 지형 → 채집/사냥/포획 → 등급·장비 → 튜토리얼 → 캐릭터 커스터마이징/슬롯 → 멀티플레이)도 각 항목이 이미 최소 하나의 실질적 구현 + QA 통과 상태에 도달한 지 오래됐다(과거 status.md 기록 참고). 규칙 7에 따라, 미착수/미해결로 남은 조각들(위 "남은 제약" 참고 — 아이템 줍기/제작, 핫바-상호작용 연결, fire 입력 이중 소비, 나무/식물/물고기 실제 스프라이트, 원격 애니메이션 동기화, 해상도/화면비 설정의 실제 화면 확인 등)은 세션이 스스로 골라 진행하지 않고 이 기록에 후보로만 남긴다. 사용자가 실제로 플레이해보고 `inbox.md`에 다음 지시를 남긴 뒤 하네스 데몬을 재기동해야 다음 실질적 작업이 시작된다.
+
+> [!IMPORTANT]
+> HARNESS_STOP: inbox.md의 모든 항목(#1~#11)이 처리 완료됐고 design.md 로드맵도 각 항목 최소 구현+QA를 이미 통과한 상태라, 새 지시 없이 스스로 다음 작업을 고르지 않고 자동 루프를 멈춘다.
+
