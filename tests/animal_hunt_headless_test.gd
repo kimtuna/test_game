@@ -35,7 +35,7 @@ func _initialize() -> void:
 		push_error("FAIL: Player가 Animal의 상호작용 범위에 들어갔는데도 player_nearby가 설정되지 않음")
 		ok = false
 
-	# 체력이 0 이하가 될 때까지 반복 공격 (MAX_HEALTH=100, ATTACK_DAMAGE=34 -> 3회).
+	# 체력이 0 이하가 될 때까지 반복 공격 (MAX_HEALTH=100, ATTACK_DAMAGE=31 -> 4회).
 	var health_label: Label = animal.get_node("HealthLabel")
 	var hits := 0
 	while is_instance_valid(animal) and animal.is_inside_tree() and hits < 10:
@@ -44,8 +44,8 @@ func _initialize() -> void:
 		Input.action_release("ui_accept")
 		await process_frame
 		hits += 1
-		if hits == 1 and health_label.text != "66/100":
-			push_error("FAIL: 1회 공격 후 체력 라벨이 기대한 값(66/100)이 아님 (실제: %s)" % health_label.text)
+		if hits == 1 and health_label.text != "69/100":
+			push_error("FAIL: 1회 공격 후 체력 라벨이 기대한 값(69/100)이 아님 (실제: %s)" % health_label.text)
 			ok = false
 
 	if is_instance_valid(animal) and animal.is_inside_tree():

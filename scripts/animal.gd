@@ -1,14 +1,23 @@
 extends Area2D
 
-# 사냥 가능한 동물의 첫 조각. design.md의 도주 트리거(발소리/시야/피격 감지)는
-# 아직 구현하지 않은 고정 개체다 — 이번 단계는 "사냥" 상호작용의 뼈대(반복
-# 공격으로 체력을 깎아 잡으면 자원을 얻는 흐름)만 다룬다. 포획(마취총, 체력
-# 8% 미만 조건)은 별도 무기/아이템 시스템이 필요해 다음 단계로 미룬다.
+# 사냥 가능한 동물. design.md의 도주 트리거(발소리/시야/피격 감지)는 아직
+# 구현하지 않은 고정 개체다. 이번 단계에서 design.md가 명시한 포획 조건
+# (체력 8% 미만 + 마취총)을 추가했다 — 마취총이라는 아이템/장비 개념이 아직
+# 없으므로, "이미 마취총을 들고 있다"고 가정하고 전용 입력 액션("capture",
+# project.godot에 C 키로 등록)을 마취총 발사로 취급하는 최소 구현이다.
+#
+# ATTACK_DAMAGE를 34 -> 31로 조정했다: 기존 34는 100 -> 66 -> 32 -> (-2, 즉사)
+# 순서라 체력이 8%(8) 미만인 1~7 구간에 정수로는 절대 도달하지 못해 포획이
+# 원천적으로 불가능했다. 31로 바꾸면 100 -> 69 -> 38 -> 7 순서가 되어 3회
+# 공격 후 정확히 7(8% 미만)에서 멈추므로, 플레이어가 거기서 공격을 멈추고
+# 포획으로 전환할 수 있는 여지가 생긴다.
 
 signal harvested(resource_name: String, amount: int)
+signal captured(animal_name: String)
 
 const MAX_HEALTH: int = 100
-const ATTACK_DAMAGE: int = 34
+const ATTACK_DAMAGE: int = 31
+const CAPTURE_HEALTH_RATIO: float = 0.08
 
 var health: int = MAX_HEALTH
 var player_nearby: CharacterBody2D = null
@@ -18,6 +27,7 @@ var player_nearby: CharacterBody2D = null
 
 func _ready() -> void:
 	add_to_group("harvestable")
+	add_to_group("capturable")
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 	sprite.texture = _create_animal_texture()
@@ -32,8 +42,12 @@ func _on_body_exited(body: Node2D) -> void:
 		player_nearby = null
 
 func _process(_delta: float) -> void:
-	if player_nearby != null and Input.is_action_just_pressed("ui_accept"):
+	if player_nearby == null:
+		return
+	if Input.is_action_just_pressed("ui_accept"):
 		_attack()
+	elif Input.is_action_just_pressed("capture"):
+		_try_capture()
 
 func _attack() -> void:
 	health -= ATTACK_DAMAGE
@@ -44,6 +58,14 @@ func _attack() -> void:
 		queue_free()
 		return
 	_update_health_label()
+
+func _try_capture() -> void:
+	if health < MAX_HEALTH * CAPTURE_HEALTH_RATIO:
+		print("동물을 포획했다.")
+		captured.emit("동물")
+		queue_free()
+	else:
+		print("체력이 충분히 낮아야(8%% 미만) 포획할 수 있다. (현재 %d/%d)" % [health, MAX_HEALTH])
 
 func _update_health_label() -> void:
 	health_label.text = "%d/%d" % [health, MAX_HEALTH]
