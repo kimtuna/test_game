@@ -210,3 +210,15 @@
 - 확인: `godot --headless --path . --quit` 에러 없음(파싱/런타임 에러 없음). `godot --headless --path . --script res://tests/animal_hunt_headless_test.gd` 실행 결과 `HEADLESS_ANIMAL_HUNT_TEST: PASS (hits=3)`. 기존 `tests/tree_harvest_headless_test.gd`(`HEADLESS_TREE_HARVEST_TEST: PASS`), `tests/boundary_headless_test.gd`(`HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)`)도 재실행해 회귀 없음을 확인.
 - 남은 제약: 동물은 완전히 고정되어 있고(이동/애니메이션 없음), 사냥 판정도 "가까이서 아무 키나 반복 누르면 죽는다"는 매우 단순한 형태다. 포획 분기(체력 8% 미만 + 마취총)가 없어 design.md의 "동물을 죽일 수도, 포획할 수도 있다"는 아직 절반(죽이기)만 구현된 상태. 화면에 동물 체력을 보여주는 UI도 없어(콘솔 출력뿐) 플레이어가 몇 대 더 때려야 하는지 알 수 없다.
 - 다음 할 일: 사냥/포획 축을 계속 이어가려면 다음으로 작은 단위 후보는 (1) 체력을 8% 미만으로 낮췄을 때 다른 입력(예: 별도 액션 또는 조건)으로 "포획"과 "사냥(처치)"을 구분하는 최소 분기 추가, 또는 (2) 화면에 동물 체력을 보여주는 간단한 UI(예: 체력바 또는 숫자)다. 도주 AI(발소리/시야/피격 감지)는 별도의 더 큰 작업이므로 서두르지 않는다. inbox.md에 새 지시가 없다면 다음 세션은 규칙 4(기능 하나만)에 따라 이 중 하나를 골라 진행한다.
+
+---
+
+### #19 — 2026-09-01 11:45 (자동 세션)
+
+- 계기: inbox.md에 미처리 항목 없음. status.md #18이 남긴 두 후보(포획/사냥 분기 vs 동물 체력 UI) 중 "화면에 동물 체력을 보여주는 UI"를 선택했다 — 포획 분기는 design.md가 명시한 마취총(별도 무기/아이템)이 아직 없는 상태에서 입력 조건만으로 흉내 내면 기획과 어긋난 임시방편이 될 위험이 있는 반면, 체력 UI는 이미 존재하는 `health` 값을 화면에 노출하는 것뿐이라 범위가 더 작고 확실하다고 판단했다.
+  - `scenes/Animal.tscn`: `Sprite2D` 위(오프셋 y=-50 근처)에 `HealthLabel`(Label, 폭 80 중앙 정렬, 폰트 크기 20) 추가. 처음에는 `Label2D` 타입으로 시도했으나 Godot 4.7에 그런 내장 클래스가 없어("Could not find type Label2D") 파싱 에러가 났다 — Node2D 자식으로 `Label`(Control)을 두면 부모의 2D 트랜스폼을 그대로 따라가며 월드 공간에 떠 있는 텍스트로 동작하는 일반적인 패턴이라는 것을 확인하고 `Label`로 교체함.
+  - `scripts/animal.gd`: `@onready var health_label: Label = $HealthLabel` 추가, `_update_health_label()`을 신설해 텍스트를 `"%d/%d" % [health, MAX_HEALTH]` 형식으로 갱신. `_ready()`에서 초기값(100/100) 표시, `_attack()`에서 공격할 때마다(단, 사냥으로 죽어서 `queue_free()`되는 경우는 제외) 갱신하도록 호출.
+  - `tests/animal_hunt_headless_test.gd`: 1회 공격 후 `HealthLabel.text`가 "66/100"인지 확인하는 검증을 추가.
+- 확인: `godot --headless --path . --quit` 에러 없음(Label2D 시행착오 이후 최종적으로 파싱/런타임 에러 없음 확인). `godot --headless --path . --script res://tests/animal_hunt_headless_test.gd` 실행 결과 `HEADLESS_ANIMAL_HUNT_TEST: PASS (hits=3)` — 체력 라벨 검증 포함. 회귀 확인을 위해 `tests/tree_harvest_headless_test.gd`(`HEADLESS_TREE_HARVEST_TEST: PASS`), `tests/boundary_headless_test.gd`(`HEADLESS_BOUNDARY_TEST: PASS (final_x=1560.0, island_right_edge=1576.0)`)도 재실행해 이상 없음을 확인.
+- 남은 제약: 체력 표시는 플레이어와의 거리와 무관하게 항상 보인다(가까이 가야만 보이게 하는 조건 없음) — design.md에 그런 제약이 명시되지 않아 상식적인 기본값으로 항상 표시함. 체력바(그래픽 바) 대신 숫자(N/100) 텍스트로만 표시해 시각적으로는 소박하다. 포획 분기(체력 8% 미만 + 마취총)는 여전히 구현되지 않았다.
+- 다음 할 일: 사냥/포획 축의 다음 단위로는 design.md가 명시한 **포획**(체력 8% 미만 상태에서 마취총으로 포획)을 시작하는 것이 자연스럽다. 마취총이라는 아이템/장비 개념이 아직 전혀 없으므로, 가장 작은 단위로는 (1) 플레이어가 소지한 것으로 가정하는 최소한의 "마취총" 개념(예: 별도 입력 액션 하나, 아이템 슬롯 없이)을 도입해 체력이 8% 미만일 때 그 입력으로 포획(동물이 사라지고 "포획 성공" 로그/자원 대신 포획 상태 기록)되는 분기를 추가하는 것, 또는 (2) 도주 AI(발소리/시야/피격 감지 중 하나)의 첫 조각을 시작하는 것 중 하나다. 두 방향 모두 design.md 로드맵(채집/사냥/포획)의 핵심에 해당하므로, inbox.md에 새 지시가 없다면 다음 세션은 규칙 4(기능 하나만)에 따라 이 중 더 작게 쪼갤 수 있는 쪽을 골라 진행한다.
