@@ -25,6 +25,17 @@ const RESOURCE_TO_SLOT: Dictionary = {
 	"채소": "sickle",
 }
 
+# inbox.md #4 4번(메인 메뉴 + 슬롯 선택 + 저장/불러오기 시스템)의 저장/불러오기
+# 조각. 지금까지 슬롯별 외형(slot_colors)은 세션(프로세스) 안에서만
+# 기억되어, "기존에 저장된 슬롯 선택 시 저장된 상태 그대로 이어서 시작"이
+# 프로세스를 새로 켜면 항상 초기화됐다. 계정 시스템·클라우드 저장은 범위
+# 밖이므로, 로컬 user:// 아래 슬롯별 JSON 파일에 외형/장비/인벤토리/포획
+# 목록을 저장하는 가장 단순한 방식을 택했다. 튜토리얼은 design.md가 "처음에"
+# 한 번만 안내한다고 명시해(캐릭터별이 아니라 계정 전체 기준) 슬롯과
+# 별도로 파일 하나(TUTORIAL_SEEN_FLAG_PATH)의 존재 여부로만 판단한다.
+const SAVE_DIR: String = "user://saves"
+const TUTORIAL_SEEN_FLAG_PATH: String = "user://saves/tutorial_seen.flag"
+
 var inventory: Dictionary = {}
 var captured_animals: Dictionary = {}
 
@@ -44,10 +55,9 @@ const BODY_COLOR_CHOICES: Dictionary = {
 	KEY_4: Color(0.6, 0.3, 0.8),
 }
 
-# 슬롯 선택 키(1~3)와 슬롯 번호 매핑. design.md의 "계정당 3개 캐릭터 슬롯"의
-# 첫 조각. 저장/불러오기 시스템 전체는 규칙 4(기능 하나만)를 넘어서므로
-# 이번 조각은 파일 저장 없이 "세션 중" 슬롯별 외형(색)을 기억하는 것까지만
-# 다룬다.
+# 슬롯 선택 키(1~3)와 슬롯 번호 매핑. design.md의 "계정당 3개 캐릭터 슬롯".
+# 이번 세션부터 슬롯별 외형/장비/인벤토리/포획 목록은 user://saves 아래
+# 파일로도 저장되어(SAVE_DIR 근처 주석 참고) 프로세스를 새로 켜도 유지된다.
 const SLOT_KEYS: Dictionary = {
 	KEY_1: 1,
 	KEY_2: 2,
@@ -78,12 +88,15 @@ const PLAYER_SPAWN_POSITION := Vector2(576, 324)
 
 var slot_colors: Dictionary = {}
 var current_slot: int = 0
-# pending_tutorial: 이번 세션에서 튜토리얼을 아직 한 번도 보여주지 않았는가.
-# 최초 슬롯 선택 -> (필요 시 커스터마이징) 흐름의 끝에서만 true -> false로
-# 소비되고, 이후 Tab으로 슬롯을 바꿀 때는 튜토리얼을 다시 띄우지 않는다.
+# pending_tutorial: 튜토리얼을 아직 한 번도 보여준 적이 없는가. _ready()에서
+# TUTORIAL_SEEN_FLAG_PATH 존재 여부로 실제 값을 정하므로(계정 전체 기준,
+# 프로세스를 새로 켜도 유지) 여기 기본값(true)은 파일이 없는 최초 실행에서만
+# 그대로 쓰인다. 최초 슬롯 선택 -> (필요 시 커스터마이징) 흐름의 끝에서만
+# true -> false로 소비되고, 이후 Tab으로 슬롯을 바꿀 때는 다시 띄우지 않는다.
 var pending_tutorial: bool = true
 
 func _ready() -> void:
+	pending_tutorial = not FileAccess.file_exists(TUTORIAL_SEEN_FLAG_PATH)
 	player_spawner.spawn_function = _create_player_instance
 	var network_manager := get_node("/root/NetworkManager")
 	network_manager.peer_connected_to_me.connect(_on_peer_connected)
@@ -170,13 +183,12 @@ func _on_peer_disconnected(id: int) -> void:
 			node.queue_free()
 
 # design.md의 "캐릭터 슬롯"과 "캐릭터 외형을 커스터마이징할 수 있다"를 잇는
-# 최소 흐름. 시작 시 슬롯(1~3)을 고르면, 그 슬롯을 이번 세션에서 처음
-# 고른 것이면 커스터마이징 오버레이로 이어져 색을 고르고(그 결과를
-# slot_colors에 저장), 이미 고른 적 있는 슬롯이면 저장해둔 색을 즉시
-# 적용한다. 게임 중에도 Tab 키로 언제든 슬롯 오버레이를 다시 열어 슬롯을
-# 바꿀 수 있어, "슬롯별로 외형이 구분되어 세션 중 기억된다"는 점이 실제로
-# 확인 가능하다. 진짜 캐릭터 저장/불러오기(파일 I/O, 계정 시스템)는 여전히
-# 범위 밖이다.
+# 흐름. 시작 시 슬롯(1~3)을 고르면 (1) 이번 세션에서 이미 고른 적 있는
+# 슬롯이면 메모리에 있는 slot_colors를 즉시 적용하고, (2) 세션 중엔 처음
+# 골랐지만 디스크에 저장 파일이 있는 슬롯이면 그 파일을 불러와 적용하고
+# (_apply_slot_data), (3) 저장 파일도 없는 진짜 새 슬롯이면 커스터마이징
+# 오버레이로 이어진다. 게임 중에도 Tab 키로 언제든 슬롯 오버레이를 다시 열어
+# 슬롯을 바꿀 수 있다. 계정 시스템(로그인 등)은 여전히 범위 밖이다.
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
@@ -189,6 +201,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				var player := get_tree().get_first_node_in_group("player")
 				if player != null:
 					player.set_body_color(slot_colors[current_slot])
+				_maybe_show_tutorial()
+			elif _has_save(current_slot):
+				_apply_slot_data(_load_slot(current_slot))
 				_maybe_show_tutorial()
 			else:
 				customization_overlay.visible = true
@@ -203,6 +218,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				player.set_body_color(color)
 			slot_colors[current_slot] = color
 			customization_overlay.visible = false
+			_save_slot(current_slot)
 			_maybe_show_tutorial()
 			get_viewport().set_input_as_handled()
 		return
@@ -220,11 +236,73 @@ func _maybe_show_tutorial() -> void:
 	if pending_tutorial:
 		tutorial_overlay.visible = true
 		pending_tutorial = false
+		_mark_tutorial_seen()
+
+func _mark_tutorial_seen() -> void:
+	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	var file := FileAccess.open(TUTORIAL_SEEN_FLAG_PATH, FileAccess.WRITE)
+	file.store_string("1")
+	file.close()
+
+func _slot_save_path(slot: int) -> String:
+	return "%s/slot_%d.save" % [SAVE_DIR, slot]
+
+func _has_save(slot: int) -> bool:
+	return FileAccess.file_exists(_slot_save_path(slot))
+
+func _save_slot(slot: int) -> void:
+	if slot <= 0 or not slot_colors.has(slot):
+		return
+	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	var player := get_tree().get_first_node_in_group("player")
+	var data := {
+		"color": [slot_colors[slot].r, slot_colors[slot].g, slot_colors[slot].b],
+		"equipment": player.equipment if player != null else {},
+		"inventory": inventory,
+		"captured_animals": captured_animals,
+	}
+	var file := FileAccess.open(_slot_save_path(slot), FileAccess.WRITE)
+	file.store_string(JSON.stringify(data))
+	file.close()
+
+func _load_slot(slot: int) -> Dictionary:
+	var file := FileAccess.open(_slot_save_path(slot), FileAccess.READ)
+	if file == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	return parsed if parsed is Dictionary else {}
+
+# 저장된 슬롯을 선택했을 때(_has_save == true), 저장 시점의 외형/장비/
+# 인벤토리/포획 목록을 그대로 복원한다. "새 슬롯"과 달리 커스터마이징
+# 오버레이를 거치지 않고 곧바로 이어서 시작한다.
+func _apply_slot_data(data: Dictionary) -> void:
+	var c: Array = data.get("color", [])
+	if c.size() == 3:
+		slot_colors[current_slot] = Color(c[0], c[1], c[2])
+	var player := get_tree().get_first_node_in_group("player")
+	if player != null:
+		if slot_colors.has(current_slot):
+			player.set_body_color(slot_colors[current_slot])
+		var equip_data: Dictionary = data.get("equipment", {})
+		for slot_name in equip_data.keys():
+			var item: Dictionary = equip_data[slot_name]
+			player.equip(slot_name, item.get("name", ""), int(item.get("grade", 1)))
+	inventory.clear()
+	for key in data.get("inventory", {}).keys():
+		inventory[key] = int(data["inventory"][key])
+	captured_animals.clear()
+	for key in data.get("captured_animals", {}).keys():
+		captured_animals[key] = int(data["captured_animals"][key])
+	_update_label()
+	_update_capture_label()
+	_update_equipment_label()
 
 func _on_harvested(resource_name: String, amount: int) -> void:
 	inventory[resource_name] = inventory.get(resource_name, 0) + amount
 	_try_upgrade_equipment(resource_name)
 	_update_label()
+	_save_slot(current_slot)
 
 func _try_upgrade_equipment(resource_name: String) -> void:
 	var slot: String = RESOURCE_TO_SLOT.get(resource_name, "")
@@ -248,6 +326,7 @@ func _try_upgrade_equipment(resource_name: String) -> void:
 func _on_captured(animal_name: String) -> void:
 	captured_animals[animal_name] = captured_animals.get(animal_name, 0) + 1
 	_update_capture_label()
+	_save_slot(current_slot)
 
 func _update_label() -> void:
 	if inventory.is_empty():

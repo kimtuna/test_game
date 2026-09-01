@@ -18,7 +18,21 @@ func _press_key(keycode: int) -> void:
 	Input.parse_input_event(event)
 	await process_frame
 
+# 이번 세션에서 main.gd에 슬롯 저장/불러오기(user://saves/*)가 추가되어,
+# 이전 실행(수동 플레이 포함)이 남긴 저장 파일이 있으면 "처음 고르는 슬롯"
+# 전제가 깨진다. 이 테스트는 그 전제에 의존하므로 시작 전에 지워 결정론을
+# 지키고, 끝에도 지워 이후 실행(다른 테스트, 수동 플레이)에 영향을 남기지
+# 않는다.
+func _clean_saves() -> void:
+	for i in range(1, 4):
+		var path := "user://saves/slot_%d.save" % i
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
+	if FileAccess.file_exists("user://saves/tutorial_seen.flag"):
+		DirAccess.remove_absolute("user://saves/tutorial_seen.flag")
+
 func _initialize() -> void:
+	_clean_saves()
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
@@ -93,6 +107,8 @@ func _initialize() -> void:
 	if player.body_color != red:
 		push_error("FAIL: 슬롯 1로 되돌아왔는데 저장해둔 빨강이 적용되지 않음 (실제: %s)" % [player.body_color])
 		ok = false
+
+	_clean_saves()
 
 	if ok:
 		print("HEADLESS_SLOT_TEST: PASS")

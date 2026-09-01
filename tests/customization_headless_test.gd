@@ -10,7 +10,19 @@ extends SceneTree
 # 스프라이트 텍스처가 해당 색으로 바뀌고 오버레이가 사라지는지, (3) 튜토리얼
 # 오버레이로 자연스럽게 넘어가는지 확인한다.
 
+# 이번 세션에서 main.gd에 슬롯 저장/불러오기(user://saves/*)가 추가되어,
+# 이전 실행이 남긴 저장 파일이 있으면 "처음 고르는 슬롯" 전제가 깨진다
+# (slot_headless_test.gd와 동일한 이유).
+func _clean_saves() -> void:
+	for i in range(1, 4):
+		var path := "user://saves/slot_%d.save" % i
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
+	if FileAccess.file_exists("user://saves/tutorial_seen.flag"):
+		DirAccess.remove_absolute("user://saves/tutorial_seen.flag")
+
 func _initialize() -> void:
+	_clean_saves()
 	var main: Node2D = load("res://scenes/Main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
@@ -72,6 +84,8 @@ func _initialize() -> void:
 	if not close_enough:
 		push_error("FAIL: 플레이어 스프라이트 텍스처 픽셀이 선택한 색이 아님 (실제: %s)" % [pixel])
 		ok = false
+
+	_clean_saves()
 
 	if ok:
 		print("HEADLESS_CUSTOMIZATION_TEST: PASS")
