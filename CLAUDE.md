@@ -4,10 +4,10 @@
 
 ## 경로
 
-- 프로젝트 루트: `/Users/tuna/Desktop/test_game`
-- 기획서: `/Users/tuna/Desktop/test_game/design.md`
-- 인수인계서: `/Users/tuna/Desktop/test_game/status.md`
-- 지시함: `/Users/tuna/Desktop/test_game/inbox.md`
+- 프로젝트 루트: `/Users/tuna/projects/test_game`
+- 기획서: `/Users/tuna/projects/test_game/design.md`
+- 인수인계서: `/Users/tuna/projects/test_game/status.md`
+- 지시함: `/Users/tuna/projects/test_game/inbox.md`
 - Godot 실행파일: `godot` (PATH에 등록됨, `/opt/homebrew/bin/godot`)
 - 원격 저장소: `https://github.com/kimtuna/test_game.git` (public, branch: `main`)
 
@@ -27,7 +27,7 @@
 4. **한 바퀴의 순서**: 읽기 → 하나 만들기 → 확인(QA) → 커밋 → 기록. 이 순서를 바꾸지 않는다.
    - 읽기: 위 세 파일을 순서대로 읽는다.
    - 하나 만들기: 이번 세션에서는 기능을 **하나만** 구현한다. 여러 개를 동시에 벌이지 않는다. (근거: 한 세션이 끝나면 기억이 사라지므로, 범위를 넓게 잡으면 미완성 상태로 세션이 끝나 다음 세션이 무엇이 완료됐는지 판단할 수 없다.)
-   - 확인(QA): 최소한 `godot --headless --path /Users/tuna/Desktop/test_game --quit` 를 실행해 파싱/런타임 에러가 없는지 확인한다. 에러가 있으면 커밋하지 않고 고친 뒤 다시 확인한다. 규칙 1의 합격 기준(품질)도 이 단계에서 스스로 점검한다.
+   - 확인(QA): 최소한 `godot --headless --path /Users/tuna/projects/test_game --quit` 를 실행해 파싱/런타임 에러가 없는지 확인한다. 에러가 있으면 커밋하지 않고 고친 뒤 다시 확인한다. 규칙 1의 합격 기준(품질)도 이 단계에서 스스로 점검한다.
    - 커밋: QA를 통과한 변경사항만 커밋한다. 커밋 메시지는 무엇을 왜 만들었는지 한 줄로 남긴다. 커밋 후 `git push origin main`까지 수행한다.
    - 기록: `status.md`에 새 번호로 이번 세션 요약(무엇을 했는지, 다음에 할 일)을 추가하고 커밋/푸시한다. `inbox.md`의 항목을 처리했다면 "처리 완료 (status.md #N에서 반영)"라고 표시한다.
 5. **QA 통과 후에는 화면을 보기 전에 먼저 커밋한다**: `godot` 에디터를 열어 시각적으로 확인하는 것보다 커밋이 먼저다. (근거: 화면을 먼저 보면 "이왕 열어본 김에" 하며 범위를 벗어난 수정을 계속하게 되어 세션이 끝나지 않는다. QA를 통과한 시점의 상태를 먼저 확정(커밋)해 두면, 이후 무엇을 보든 최소한 그 지점으로 안전하게 되돌아갈 수 있다.)
