@@ -114,3 +114,15 @@
   - `tests/loop_headless_test.gd`: 변경된 텍스트 포맷에 맞춰 `expected_score_text`를 `"Score: %d / %d" % [total_items, total_items]`로 갱신.
 - 확인: `godot --headless --path . --quit` 에러 없음. `godot --headless --path . --script res://tests/loop_headless_test.gd` 실행 결과 `HEADLESS_LOOP_TEST: PASS (score=Score: 3 / 3, clear=true)` — 포맷 변경 후에도 이동→수집→점수→클리어 전체 루프 정상 동작 확인.
 - 다음 할 일: design.md의 1차 완료 정의는 여전히 충족된 상태다. inbox.md에 새 지시가 없는 한, 다음 세션도 design.md가 명시적으로 제한한 확장 범위(적, 타이머, 여러 레벨, 사운드 등)를 임의로 진행하지 말아야 한다. 이번 세션까지 UI 표시·앵커·충돌 판정·텍스처·창 리사이즈에 대한 점검이 여러 차례 반복되었으므로, 다음 자동 세션은 (1) 여전히 남아있을 수 있는 세부 결함을 새로운 관점에서 찾아보되 억지로 만들어내지 말고, (2) 특별한 결함이 없다면 사용자에게 inbox.md를 통한 다음 확장 방향(적, 타이머, 여러 레벨, 사운드, 재시작 기능 등) 지시를 요청하며 대기하는 것이 맞다.
+
+---
+
+### #12 — 2026-09-01 (자동 세션)
+
+- 계기: inbox #1(design.md를 "동물의 숲 스타일 나만의 섬" 기획으로 전면 교체) 처리. inbox #1의 지시 3개 중 이번 세션은 규칙 4(기능 하나만)에 따라 지시 1번(구 프로토타입 정리)만 처리했다. 지시 2·3번(새 기획 로드맵의 첫 조각 구현, 세부 판단 기준)은 다음 세션 이후로 이어간다.
+- 한 일:
+  - 이전 design.md(탑다운 아이템 수집 프로토타입) 기준으로 만들어졌던 `scenes/Item.tscn`, `scripts/item.gd`, `scripts/main.gd`(점수/클리어 로직), `tests/loop_headless_test.gd`를 삭제. 새 기획(나만의 섬 라이프시뮬레이션)과 무관한 코드이기 때문.
+  - `scenes/Main.tscn`을 `Player` 인스턴스 하나만 남긴 최소 상태로 재작성 — Item 인스턴스 3개, `UI` CanvasLayer(ScoreLabel/ClearLabel), `main.gd` 스크립트 연결을 모두 제거.
+  - `scripts/player.gd`(캐릭터 이동)와 `scenes/Player.tscn`은 새 기획의 "캐릭터 이동/카메라" 단계에서도 그대로 쓸 수 있어 유지.
+- 확인: `godot --headless --path . --quit` 에러 없음 (파싱/런타임 에러 없음). 정리 후 남은 씬 구조가 단순해 헤드리스 통합 테스트는 이번엔 별도로 만들지 않음 — 다음 세션에서 새 기획 기준의 핵심 루프가 생기면 그에 맞는 테스트를 다시 만든다.
+- 다음 할 일: design.md의 "진행 방식에 대한 참고"에 명시된 순서의 첫 단계인 **캐릭터 이동/카메라**를 이어간다. 이동은 이미 있으므로, 다음 세션은 `Camera2D`를 `Player.tscn`에 추가해 카메라가 캐릭터를 따라다니게 만드는 작은 단위 하나만 구현하는 것을 권장한다. inbox #1의 지시 2·3번(로드맵 순서 참고, 세부 수치는 상식적 기본값으로 판단 후 근거를 status.md에 기록)은 계속 유효하므로 앞으로도 참고할 것.
