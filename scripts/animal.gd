@@ -38,6 +38,15 @@ extends Area2D
 # 도주) 플레이어 반대 방향으로 FLEE_DURATION초 동안 FLEE_SPEED 속도로
 # 이동한다. 포획 시도(capture, 마취총)는 피해를 주는 "공격"이 아니라 별도
 # 행동이므로 도주를 유발하지 않는다.
+#
+# design.md의 "등급·장비" 단계 첫 조각으로 등급(grade, 1~3)을 추가했다.
+# 높은 등급일수록 잡기 어렵다는 요구를, 최대 체력을 grade에 비례해 늘리는
+# 방식(max_health = MAX_HEALTH * grade)으로 구현했다 — ATTACK_DAMAGE는
+# 그대로 두어 등급이 높을수록 사냥에 필요한 타격 횟수가 자연스럽게 늘어난다.
+# 포획 조건(체력 8% 미만)도 max_health 기준 비율이라 grade와 무관하게 동일한
+# 규칙으로 동작한다. MAX_HEALTH라는 이름은 기존 헤드리스 테스트가
+# `animal.MAX_HEALTH`로 직접 참조하고 있어 grade=1 기준값(기본 개체 100)으로
+# 그대로 유지했다.
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -48,6 +57,9 @@ const CAPTURE_HEALTH_RATIO: float = 0.08
 const FLEE_SPEED: float = 220.0
 const FLEE_DURATION: float = 0.6
 
+@export_range(1, 3) var grade: int = 1
+
+var max_health: int = MAX_HEALTH
 var health: int = MAX_HEALTH
 var player_nearby: CharacterBody2D = null
 var player_in_sight: CharacterBody2D = null
@@ -59,6 +71,7 @@ var terrain: Node = null
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var health_label: Label = $HealthLabel
+@onready var grade_label: Label = $GradeLabel
 @onready var sight_area: Area2D = $SightArea
 @onready var sound_area: Area2D = $SoundArea
 
@@ -72,6 +85,9 @@ func _ready() -> void:
 	sound_area.body_entered.connect(_on_sound_body_entered)
 	sound_area.body_exited.connect(_on_sound_body_exited)
 	sprite.texture = _create_animal_texture()
+	max_health = MAX_HEALTH * grade
+	health = max_health
+	grade_label.text = "Lv.%d" % grade
 	_update_health_label()
 	terrain = get_tree().get_first_node_in_group("terrain")
 
@@ -147,15 +163,15 @@ func _start_fleeing(threat: Node2D = null) -> void:
 		flee_direction = Vector2.RIGHT
 
 func _try_capture() -> void:
-	if health < MAX_HEALTH * CAPTURE_HEALTH_RATIO:
+	if health < max_health * CAPTURE_HEALTH_RATIO:
 		print("동물을 포획했다.")
 		captured.emit("동물")
 		queue_free()
 	else:
-		print("체력이 충분히 낮아야(8%% 미만) 포획할 수 있다. (현재 %d/%d)" % [health, MAX_HEALTH])
+		print("체력이 충분히 낮아야(8%% 미만) 포획할 수 있다. (현재 %d/%d)" % [health, max_health])
 
 func _update_health_label() -> void:
-	health_label.text = "%d/%d" % [health, MAX_HEALTH]
+	health_label.text = "%d/%d" % [health, max_health]
 
 func _create_animal_texture() -> ImageTexture:
 	var image := Image.create(40, 32, false, Image.FORMAT_RGBA8)
