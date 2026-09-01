@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/terrain.gd" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/Tree.tscn" id="3"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/Animal.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/Fish.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://scenes/Plant.tscn" id="7"]
+[ext_resource type="Script" path="res://scripts/pause_overlay.gd" id="8"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("4")
@@ -206,8 +207,50 @@ Space / Enter: 식물/나무 채집, 물고기 낚시
 좌클릭: 발사(장착한 탄종류로 공격 또는 포획)
 우클릭: 탄종류 변경(일반탄 ↔ 마취탄)   R: 재장전
 마취탄으로 체력 8% 미만인 동물을 맞히면 포획됩니다
+ESC: 일시정지(메인 메뉴로 나가기)
 
 아무 키나 눌러 시작하기"
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
+
+[node name="PauseOverlay" type="Control" parent="UI"]
+process_mode = 3
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+script = ExtResource("8")
+
+[node name="Background" type="ColorRect" parent="UI/PauseOverlay"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="PausePanel" type="VBoxContainer" parent="UI/PauseOverlay"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -120.0
+offset_top = -90.0
+offset_right = 120.0
+offset_bottom = 90.0
+theme_override_constants/separation = 16
+
+[node name="PauseLabel" type="Label" parent="UI/PauseOverlay/PausePanel"]
+theme_override_font_sizes/font_size = 26
+text = "일시 정지"
+horizontal_alignment = 1
+
+[node name="ResumeButton" type="Button" parent="UI/PauseOverlay/PausePanel"]
+custom_minimum_size = Vector2(0, 44)
+theme_override_font_sizes/font_size = 20
+text = "이어하기 (ESC)"
+
+[node name="MainMenuButton" type="Button" parent="UI/PauseOverlay/PausePanel"]
+custom_minimum_size = Vector2(0, 44)
+theme_override_font_sizes/font_size = 20
+text = "메인 메뉴로"
+
+[connection signal="pressed" from="UI/PauseOverlay/PausePanel/ResumeButton" to="UI/PauseOverlay" method="_on_resume_pressed"]
+[connection signal="pressed" from="UI/PauseOverlay/PausePanel/MainMenuButton" to="UI/PauseOverlay" method="_on_main_menu_pressed"]

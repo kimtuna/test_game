@@ -45,6 +45,7 @@ var captured_animals: Dictionary = {}
 @onready var slot_overlay: Control = $UI/SlotOverlay
 @onready var customization_overlay: Control = $UI/CustomizationOverlay
 @onready var tutorial_overlay: Control = $UI/TutorialOverlay
+@onready var pause_overlay: Control = $UI/PauseOverlay
 
 # 색상 선택 키(1~4)와 스와치 색상을 한 곳에 묶어, 씬의 Swatch 노드 색과
 # 어긋나지 않도록 함(#15/#22에서 배운 "값 중복으로 인한 잠재 버그" 반복 방지).
@@ -189,6 +190,14 @@ func _on_peer_disconnected(id: int) -> void:
 # (_apply_slot_data), (3) 저장 파일도 없는 진짜 새 슬롯이면 커스터마이징
 # 오버레이로 이어진다. 게임 중에도 Tab 키로 언제든 슬롯 오버레이를 다시 열어
 # 슬롯을 바꿀 수 있다. 계정 시스템(로그인 등)은 여전히 범위 밖이다.
+#
+# status.md #50이 남긴 "게임 중 메인 메뉴로 나가는 흐름" 공백을 메우는 조각.
+# 다른 오버레이(슬롯/커스터마이징/튜토리얼)가 떠 있지 않을 때만 ESC로
+# 일시정지 메뉴(PauseOverlay)를 연다 — 슬롯 선택 중에 ESC를 누르면 메뉴 밖으로
+# 나가버리는 경우를 막기 위함이다. 실제 재개/메인 메뉴 이동 로직은
+# pause_overlay.gd에 있다(그 노드만 process_mode=ALWAYS라 get_tree().paused
+# 상태에서도 입력을 받을 수 있기 때문에, 그 이후의 입력 처리는 이 함수가 아니라
+# 그 스크립트가 맡는다).
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
@@ -225,6 +234,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if tutorial_overlay.visible:
 		tutorial_overlay.visible = false
+		get_viewport().set_input_as_handled()
+		return
+
+	if pause_overlay.visible:
+		return
+
+	if event.keycode == KEY_ESCAPE:
+		pause_overlay.visible = true
+		get_tree().paused = true
 		get_viewport().set_input_as_handled()
 		return
 
