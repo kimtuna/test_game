@@ -39,6 +39,23 @@ var current_ammo: int = MAGAZINE_SIZE
 const SPEED := 300.0
 const DEFAULT_BODY_COLOR := Color(0.2, 0.6, 1.0)
 
+# inbox.md #5: "총인데 직접 다가가서 때려야 한다"는 지적에 따라, 발사 판정을
+# animal.gd의 근접 Area2D(player_nearby, 반경 50)에서 실제 사거리 기반으로
+# 바꾼다. FIRE_RANGE 밖의 대상은 아예 맞힐 수 없고, FIRE_RANGE 안이라도
+# POINT_BLANK_DISTANCE(기존 근접 반경과 동일한 50)보다 먼 대상은 조준 방향
+# (facing_direction) 쪽 FIRE_ANGLE_TOLERANCE_DEG 안에 있어야 맞는다 — 완전히
+# 붙어있을 때는 어느 쪽을 보고 있든 맞는 것이 상식적이라 각도 검사를
+# 건너뛴다. facing_direction은 실제 마우스 커서 방향 대신 "현재 이동
+# 방향"(inbox #5가 명시적으로 허용한 두 옵션 중 하나)으로 정했다 — 이
+# 저장소의 다른 입력들(switch_ammo/reload, player.gd 주석 참고)과 마찬가지로
+# 헤드리스 테스트는 실제 마우스 위치를 흉내낼 수단이 없어, 마우스 기반으로
+# 하면 자동 QA로 검증이 불가능해지기 때문이다.
+const FIRE_RANGE := 350.0
+const POINT_BLANK_DISTANCE := 50.0
+const FIRE_ANGLE_TOLERANCE_DEG := 25.0
+
+var facing_direction: Vector2 = Vector2.DOWN
+
 # design.md "기본 코디(의상) 제공: 별도로 맞추지 않아도 입고 시작할 수 있는
 # 기본 복장이 있다"를 지금까지는 "장비 슬롯이 처음부터 채워져 있다"로만
 # 해석했다(player.gd 상단 주석 참고) — 실제로 화면에 "옷을 입고 있다"고 보일
@@ -104,19 +121,54 @@ func _physics_process(_delta: float) -> void:
 	var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	velocity = direction * SPEED
 	move_and_slide()
+	if direction.length() > 0.0:
+		facing_direction = direction.normalized()
 
-	# 우클릭(탄종류 변경)과 R(재장전)을 처리한다. 발사(좌클릭)는 animal.gd가
-	# player_nearby로 근접 여부를 이미 판정하고 있으므로 그쪽에서 직접
-	# Input.is_action_just_pressed("fire")를 읽는 기존 패턴(ui_accept/capture가
-	# tree.gd/animal.gd에서 쓰던 폴링 방식)과 일관되게, 여기서도 _unhandled_input
-	# 대신 폴링을 쓴다 — 기존 헤드리스 테스트들이 Input.action_press()로 입력을
-	# 흉내내는데, 이 방식은 실제 InputEvent를 만들어 _input/_unhandled_input으로
-	# 전달하지 않고 Input 싱글턴의 폴링 상태만 바꾸기 때문에, 이벤트 콜백
-	# 방식으로 짜면 헤드리스 테스트로 검증할 수 없다.
+	# 좌클릭(발사)/우클릭(탄종류 변경)/R(재장전) 모두 여기서 폴링한다 — 기존
+	# 헤드리스 테스트들이 Input.action_press()로 입력을 흉내내는데, 이 방식은
+	# 실제 InputEvent를 만들어 _input/_unhandled_input으로 전달하지 않고 Input
+	# 싱글턴의 폴링 상태만 바꾸기 때문에, 이벤트 콜백 방식으로 짜면 헤드리스
+	# 테스트로 검증할 수 없다. 세 액션을 elif로 묶으면, 한 액션의 "방금 눌림"
+	# 상태가 (헤드리스 테스트가 physics_frame을 기다리지 않아) 아직 소비되지
+	# 않은 채 다음 물리 프레임까지 남아있을 때 다른 액션의 elif 분기를 가로채
+	# 아예 실행되지 않게 만드는 문제가 있었다(실제로 mouse_hunt 테스트에서
+	# reload가 fire에 가려 호출되지 않는 회귀로 나타남). 서로 다른 입력이라
+	# 논리적으로도 배타적일 필요가 없으므로 독립된 if로 분리한다.
+	if Input.is_action_just_pressed("fire"):
+		_fire()
 	if Input.is_action_just_pressed("switch_ammo"):
 		switch_ammo_type()
-	elif Input.is_action_just_pressed("reload"):
+	if Input.is_action_just_pressed("reload"):
 		reload()
+
+# 사거리/조준 조건을 만족하는 가장 가까운 동물을 찾아 발사 판정을 넘긴다.
+# "무엇을 맞힐 수 있는가"만 여기서 결정하고, 탄약 소모나 공격/포획 게이트 같은
+# 기존 판정은 그대로 animal.gd의 handle_fire()가 담당한다(inbox.md #5).
+func _fire() -> void:
+	var target := _find_fire_target()
+	if target != null:
+		target.handle_fire(self)
+
+func _find_fire_target() -> Node:
+	var best_target: Node = null
+	var best_distance := INF
+	for candidate in get_tree().get_nodes_in_group("capturable"):
+		var to_target: Vector2 = candidate.global_position - global_position
+		var distance := to_target.length()
+		if distance > FIRE_RANGE:
+			continue
+		if distance > POINT_BLANK_DISTANCE:
+			# angle_to()는 -180~180 사이의 부호 있는 각도를 반환한다. abs() 없이
+			# 그대로 비교하면 정반대 방향(180도 근처, 부호에 따라 -180으로 나올
+			# 수 있음)이 오히려 tolerance보다 "작다"고 잘못 판정돼 반대쪽을
+			# 조준해도 맞아버리는 버그가 생긴다.
+			var angle := absf(rad_to_deg(facing_direction.angle_to(to_target.normalized())))
+			if angle > FIRE_ANGLE_TOLERANCE_DEG:
+				continue
+		if distance < best_distance:
+			best_distance = distance
+			best_target = candidate
+	return best_target
 
 func switch_ammo_type() -> void:
 	var types: Array = AMMO_TYPE_NAMES.keys()

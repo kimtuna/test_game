@@ -67,6 +67,15 @@ extends Area2D
 # 값으로 맞췄다(등급별 보상 차등). 포획(capture)은 동물을 자원으로 소비하는
 # 것이 아니라 개체를 그대로 소유하게 되는 별개 경로라 보상 수량 개념이 없고,
 # 이번 변경 대상이 아니다.
+#
+# inbox.md #5: "총인데 근접해야 맞는다"는 지적에 따라, "무엇을 맞힐 수
+# 있는가"의 판정 주체를 이 스크립트(player_nearby 기반 폴링)에서 player.gd로
+# 옮겼다. player.gd가 사거리/조준 방향을 확인해 대상을 고른 뒤 handle_fire()를
+# 직접 호출하고, 그 안에서 탄약 소모와 공격/포획 분기(위 문단들의 게이트
+# 로직)는 그대로 재사용한다. player_nearby 자체(및 Area2D)는 지우지 않았다 —
+# 여전히 "완전히 붙어있을 때는 조준 방향과 무관하게 맞는다"는 최소 사거리
+# 처리(player.gd의 POINT_BLANK_DISTANCE)와 기존 헤드리스 테스트의 근접 확인
+# 용도로 쓰인다.
 
 signal harvested(resource_name: String, amount: int)
 signal captured(animal_name: String)
@@ -138,16 +147,17 @@ func _on_sound_body_exited(body: Node2D) -> void:
 	if body == player_in_sound_range:
 		player_in_sound_range = null
 
-func _process(_delta: float) -> void:
-	if player_nearby == null:
+# player.gd가 사거리/조준 판정(inbox.md #5)을 통과시켜 이 동물을 발사
+# 대상으로 골랐을 때 호출한다. player_nearby(근접 Area2D, 상호작용 반경 50)와
+# 무관하게 shooter가 곧 발사한 플레이어다 — 탄약 소모 후 ammo_type에 따라
+# 공격/포획으로 분기하는 기존 로직은 그대로 유지한다.
+func handle_fire(shooter: CharacterBody2D) -> void:
+	if not shooter.try_consume_ammo():
 		return
-	if Input.is_action_just_pressed("fire"):
-		if not player_nearby.try_consume_ammo():
-			return
-		if player_nearby.ammo_type == "tranquilizer":
-			_try_capture()
-		else:
-			_attack()
+	if shooter.ammo_type == "tranquilizer":
+		_try_capture(shooter)
+	else:
+		_attack(shooter)
 
 func _physics_process(delta: float) -> void:
 	if not is_fleeing:
@@ -164,12 +174,12 @@ func _physics_process(delta: float) -> void:
 	if flee_timer <= 0.0:
 		is_fleeing = false
 
-func _attack() -> void:
-	if not player_nearby.has_equipped("tool"):
+func _attack(shooter: CharacterBody2D) -> void:
+	if not shooter.has_equipped("tool"):
 		print("도구가 없어 공격할 수 없다.")
 		return
-	if player_nearby.get_equipment_grade("tool") < grade:
-		print("도구 등급이 부족해 공격할 수 없다. (필요 등급: %d, 보유 등급: %d)" % [grade, player_nearby.get_equipment_grade("tool")])
+	if shooter.get_equipment_grade("tool") < grade:
+		print("도구 등급이 부족해 공격할 수 없다. (필요 등급: %d, 보유 등급: %d)" % [grade, shooter.get_equipment_grade("tool")])
 		return
 	health -= ATTACK_DAMAGE
 	print("동물을 공격했다. 남은 체력: %d" % health)
@@ -179,7 +189,7 @@ func _attack() -> void:
 		queue_free()
 		return
 	_update_health_label()
-	_start_fleeing()
+	_start_fleeing(shooter)
 
 func _start_fleeing(threat: Node2D = null) -> void:
 	is_fleeing = true
@@ -191,12 +201,12 @@ func _start_fleeing(threat: Node2D = null) -> void:
 	else:
 		flee_direction = Vector2.RIGHT
 
-func _try_capture() -> void:
-	if not player_nearby.has_equipped("weapon"):
+func _try_capture(shooter: CharacterBody2D) -> void:
+	if not shooter.has_equipped("weapon"):
 		print("마취총이 없어 포획할 수 없다.")
 		return
-	if player_nearby.get_equipment_grade("weapon") < grade:
-		print("마취총 등급이 부족해 포획할 수 없다. (필요 등급: %d, 보유 등급: %d)" % [grade, player_nearby.get_equipment_grade("weapon")])
+	if shooter.get_equipment_grade("weapon") < grade:
+		print("마취총 등급이 부족해 포획할 수 없다. (필요 등급: %d, 보유 등급: %d)" % [grade, shooter.get_equipment_grade("weapon")])
 		return
 	if health < max_health * CAPTURE_HEALTH_RATIO:
 		print("동물을 포획했다.")
