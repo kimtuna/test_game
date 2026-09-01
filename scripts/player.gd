@@ -29,10 +29,18 @@ const DEFAULT_BODY_COLOR := Color(0.2, 0.6, 1.0)
 var body_color: Color = DEFAULT_BODY_COLOR
 
 @onready var sprite: Sprite2D = $Sprite2D
+@onready var camera: Camera2D = $Camera2D
 
 func _ready() -> void:
 	add_to_group("player")
 	_apply_body_color(body_color)
+	# status.md #33/#34가 남긴 제약: 카메라는 authority propagation으로
+	# 모든 피어에 복제되지만 enabled 값 자체는 authority와 무관하게 항상
+	# true였다 — 호스트 화면에 접속자의 Player까지 함께 존재하면(스폰
+	# 이후) 카메라가 두 개 이상 동시에 활성 상태가 되어 어느 쪽이 실제로
+	# 보이는 화면인지 엔진이 임의로 결정하는 문제였다. 각 피어는 자신이
+	# 조작하는(authority인) Player의 카메라만 켜야 한다.
+	camera.enabled = is_multiplayer_authority()
 
 # design.md의 "캐릭터 외형을 커스터마이징할 수 있다"의 첫 조각. 아직 별도
 # 아트 리소스가 없어(범위 밖) 지금까지 절차적 단색 텍스처를 써온 패턴을
