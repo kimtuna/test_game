@@ -6,6 +6,8 @@ extends Area2D
 # 누르면 나무가 사라지고 자원을 얻는다. design.md의 등급/장비 시스템은 아직
 # 범위 밖이므로, 이번 단계는 "채집" 상호작용의 가장 작은 단위만 구현한다.
 
+signal harvested(resource_name: String, amount: int)
+
 var player_nearby: CharacterBody2D = null
 
 @onready var sprite: Sprite2D = $Sprite2D
@@ -30,6 +32,7 @@ func _process(_delta: float) -> void:
 
 func _harvest() -> void:
 	print("나무를 채집했다: 통나무 x1")
+	harvested.emit("통나무", 1)
 	queue_free()
 
 func _create_tree_texture() -> ImageTexture:

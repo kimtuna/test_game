@@ -45,6 +45,11 @@ func _initialize() -> void:
 		push_error("FAIL: 범위 안에서 ui_accept를 눌렀는데도 나무가 사라지지 않음")
 		ok = false
 
+	var inventory_label: Label = main.get_node("UI/InventoryLabel")
+	if inventory_label.text != "통나무: 1":
+		push_error("FAIL: 채집 후 인벤토리 라벨이 기대한 값(통나무: 1)이 아님 (실제: %s)" % inventory_label.text)
+		ok = false
+
 	if ok:
 		print("HEADLESS_TREE_HARVEST_TEST: PASS")
 		quit(0)
